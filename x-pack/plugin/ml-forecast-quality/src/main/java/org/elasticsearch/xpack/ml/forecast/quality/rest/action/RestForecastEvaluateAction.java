@@ -15,7 +15,6 @@ import org.elasticsearch.rest.action.RestToXContentListener;
 import org.elasticsearch.rest.BaseRestHandler;
 import org.elasticsearch.xpack.core.ml.job.config.Job;
 import org.elasticsearch.xpack.ml.forecast.quality.action.ForecastEvaluateAction;
-import org.elasticsearch.xpack.ml.forecast.quality.action.ForecastEvaluateAction.Request;
 
 import java.io.IOException;
 

@@ -27,6 +27,7 @@ import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.threadpool.ThreadPool;
+import org.elasticsearch.threadpool.ThreadPool.Names;
 import org.elasticsearch.transport.TransportService;
 import org.elasticsearch.xpack.core.ml.MlMetadata;
 import org.elasticsearch.xpack.core.ml.job.config.Job;
@@ -70,7 +71,9 @@ public class TransportForecastEvaluateAction
 
     @Override
     protected void doExecute(Request request, ActionListener<Response> listener) {
-        new AsyncForecastEvaluateAction(request, listener).start();
+        threadPool.executor(Names.GENERIC).execute(() -> {
+            new AsyncForecastEvaluateAction(request, listener).start();
+        });
     }
 
     class AsyncForecastEvaluateAction {
