@@ -4,7 +4,7 @@
  * you may not use this file except in compliance with the Elastic License.
  */
 
-package org.elasticsearch.xpack.ml_forecastquality.extractor;
+package org.elasticsearch.xpack.ml.forecast.quality.extractor;
 
 import org.elasticsearch.ElasticsearchParseException;
 import org.elasticsearch.action.search.SearchRequest;

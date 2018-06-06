@@ -4,11 +4,11 @@
  * you may not use this file except in compliance with the Elastic License.
  */
 
-package org.elasticsearch.xpack.ml_forecastquality.calculator;
+package org.elasticsearch.xpack.ml.forecast.quality.calculator;
 
 public class AccuracyMeasure {
     private final int count;
-    private final long timeSpanInSeconds;
+    private final long timeSpanInMillis;
     private final double meanAbsoluteError;
     private final double meanAbsolutePercentageError;
     private final double medianAbsolutePercentageError;
@@ -18,7 +18,7 @@ public class AccuracyMeasure {
     public AccuracyMeasure(int count, long timeSpanInSeconds, double meanAbsoluteError, double meanAbsolutePercentageError,
             double medianAbsolutePercentageError, double symetricmeanAbsolutePercentageError, double meanAbsoluteScaledError) {
         this.count = count;
-        this.timeSpanInSeconds = timeSpanInSeconds;
+        this.timeSpanInMillis = timeSpanInSeconds;
         this.meanAbsoluteError = meanAbsoluteError;
         this.meanAbsolutePercentageError = meanAbsolutePercentageError;
         this.medianAbsolutePercentageError = medianAbsolutePercentageError;
@@ -31,7 +31,7 @@ public class AccuracyMeasure {
     }
 
     public long getTimeSpanInSeconds() {
-        return timeSpanInSeconds;
+        return timeSpanInMillis;
     }
 
     public double getMeanAbsoluteError() {

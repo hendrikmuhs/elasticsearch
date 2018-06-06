@@ -7,8 +7,8 @@
 package org.elasticsearch.xpack.ml_forecastquality.action;
 
 import org.elasticsearch.test.AbstractStreamableTestCase;
-import org.elasticsearch.xpack.ml_forecastquality.action.ForecastEvaluateAction.Response;
-import org.elasticsearch.xpack.ml_forecastquality.calculator.AccuracyMeasure;
+import org.elasticsearch.xpack.ml.forecast.quality.action.ForecastEvaluateAction.Response;
+import org.elasticsearch.xpack.ml.forecast.quality.calculator.AccuracyMeasure;
 
 public class ForecastEvaluateActionResponseTests extends AbstractStreamableTestCase<Response> {
 

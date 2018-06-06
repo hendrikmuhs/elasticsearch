@@ -4,10 +4,11 @@
  * you may not use this file except in compliance with the Elastic License.
  */
 
-package org.elasticsearch.xpack.ml_forecastquality.action;
+package org.elasticsearch.xpack.ml.forecast.quality.action;
 
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.ElasticsearchParseException;
+import org.elasticsearch.ResourceNotFoundException;
 import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.get.GetRequest;
 import org.elasticsearch.action.get.GetResponse;
@@ -27,7 +28,6 @@ import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.threadpool.ThreadPool;
 import org.elasticsearch.transport.TransportService;
-import org.elasticsearch.xpack.core.ml.MLMetadataField;
 import org.elasticsearch.xpack.core.ml.MlMetadata;
 import org.elasticsearch.xpack.core.ml.job.config.Job;
 import org.elasticsearch.xpack.core.ml.job.config.ModelPlotConfig;
@@ -35,12 +35,12 @@ import org.elasticsearch.xpack.core.ml.job.persistence.AnomalyDetectorsIndex;
 import org.elasticsearch.xpack.core.ml.job.persistence.ElasticsearchMappings;
 import org.elasticsearch.xpack.core.ml.job.results.ForecastRequestStats;
 import org.elasticsearch.xpack.core.ml.job.results.Result;
-import org.elasticsearch.xpack.ml_forecastquality.calculator.AccuracyCalculator;
-import org.elasticsearch.xpack.ml_forecastquality.action.ForecastEvaluateAction.Request;
-import org.elasticsearch.xpack.ml_forecastquality.action.ForecastEvaluateAction.Response;
-import org.elasticsearch.xpack.ml_forecastquality.calculator.AccuracyMeasure;
-import org.elasticsearch.xpack.ml_forecastquality.extractor.ForecastErrorBarExtractor;
-import org.elasticsearch.xpack.ml_forecastquality.extractor.ModelPlotErrorBarExtractor;
+import org.elasticsearch.xpack.ml.forecast.quality.action.ForecastEvaluateAction.Request;
+import org.elasticsearch.xpack.ml.forecast.quality.action.ForecastEvaluateAction.Response;
+import org.elasticsearch.xpack.ml.forecast.quality.calculator.AccuracyCalculator;
+import org.elasticsearch.xpack.ml.forecast.quality.calculator.AccuracyMeasure;
+import org.elasticsearch.xpack.ml.forecast.quality.extractor.ForecastErrorBarExtractor;
+import org.elasticsearch.xpack.ml.forecast.quality.extractor.ModelPlotErrorBarExtractor;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -88,11 +88,13 @@ public class TransportForecastEvaluateAction
 
         public void start() {
             ClusterState clusterState = clusterService.state();
-            MlMetadata mlMetadata = clusterState.metaData().custom(MLMetadataField.TYPE);
+            MlMetadata mlMetadata = MlMetadata.getMlMetadata(clusterState);
+            
+            // INTEGRATION: use JobManager.getJobOrThrowIfUnknown
             Job job = mlMetadata.getJobs().get(request.getJobId());
 
             if (job == null) {
-                listener.onFailure(new ElasticsearchException("Job with id [{}] not found", request.getJobId()));
+                listener.onFailure(new ResourceNotFoundException("Job with id [{}] not found", request.getJobId()));
                 return;
             }
 
@@ -109,9 +111,9 @@ public class TransportForecastEvaluateAction
 
             getForecastRequestStats(request.getJobId(), request.getForecastId(), forecastRequestStats -> {
                 if (forecastRequestStats == null) {
-                    listener.onFailure(new ElasticsearchException("Forecast with id [{}] not found", request.getForecastId()));
+                    listener.onFailure(new ResourceNotFoundException("Forecast with id [{}] not found", request.getForecastId()));
                 } else if (forecastRequestStats.getStatus() == ForecastRequestStats.ForecastRequestStatus.FAILED) {
-                    listener.onFailure(new ElasticsearchException("Forecast with id [{}]", request.getForecastId()));
+                    listener.onFailure(new ResourceNotFoundException("Forecast with id [{}] failed", request.getForecastId()));
                 } else {
                     job.getResultsIndexName();
                     Instant startTime = forecastRequestStats.getStartTime();
@@ -123,14 +125,14 @@ public class TransportForecastEvaluateAction
 
                     AccuracyMeasure scores = AccuracyCalculator.compare(modelPlotExtractor, forecastExtractor);
                     long took = threadPool.relativeTimeInMillis() - this.startTime;
-                    listener.onResponse(
-                            new ForecastEvaluateAction.Response(scores, took));
+                    listener.onResponse(new ForecastEvaluateAction.Response(scores, took));
                 }
             }, errorResponse -> {
                 listener.onFailure(errorResponse);
             });
         }
-
+        
+        // INTEGRATION: all 3 methods are duplicated from JobProvider, to be re-factored
         private void getForecastRequestStats(String jobId, String forecastId, Consumer<ForecastRequestStats> handler,
                 Consumer<Exception> errorHandler) {
             String indexName = AnomalyDetectorsIndex.jobResultsAliasedName(jobId);

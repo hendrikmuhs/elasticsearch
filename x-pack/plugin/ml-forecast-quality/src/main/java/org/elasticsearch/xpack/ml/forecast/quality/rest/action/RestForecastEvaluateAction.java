@@ -4,7 +4,7 @@
  * you may not use this file except in compliance with the Elastic License.
  */
 
-package org.elasticsearch.xpack.ml_forecastquality.rest.action;
+package org.elasticsearch.xpack.ml.forecast.quality.rest.action;
 
 import org.elasticsearch.client.node.NodeClient;
 import org.elasticsearch.common.settings.Settings;
@@ -14,8 +14,8 @@ import org.elasticsearch.rest.RestRequest;
 import org.elasticsearch.rest.action.RestToXContentListener;
 import org.elasticsearch.rest.BaseRestHandler;
 import org.elasticsearch.xpack.core.ml.job.config.Job;
-import org.elasticsearch.xpack.ml_forecastquality.action.ForecastEvaluateAction;
-import org.elasticsearch.xpack.ml_forecastquality.action.ForecastEvaluateAction.Request;
+import org.elasticsearch.xpack.ml.forecast.quality.action.ForecastEvaluateAction;
+import org.elasticsearch.xpack.ml.forecast.quality.action.ForecastEvaluateAction.Request;
 
 import java.io.IOException;
 

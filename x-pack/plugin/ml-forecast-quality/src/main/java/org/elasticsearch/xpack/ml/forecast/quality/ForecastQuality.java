@@ -4,7 +4,7 @@
  * you may not use this file except in compliance with the Elastic License.
  */
 
-package org.elasticsearch.xpack.ml_forecastquality;
+package org.elasticsearch.xpack.ml.forecast.quality;
 
 import org.elasticsearch.action.ActionRequest;
 import org.elasticsearch.action.ActionResponse;
@@ -18,9 +18,9 @@ import org.elasticsearch.plugins.ActionPlugin;
 import org.elasticsearch.plugins.Plugin;
 import org.elasticsearch.rest.RestController;
 import org.elasticsearch.rest.RestHandler;
-import org.elasticsearch.xpack.ml_forecastquality.action.ForecastEvaluateAction;
-import org.elasticsearch.xpack.ml_forecastquality.action.TransportForecastEvaluateAction;
-import org.elasticsearch.xpack.ml_forecastquality.rest.action.RestForecastEvaluateAction;
+import org.elasticsearch.xpack.ml.forecast.quality.action.ForecastEvaluateAction;
+import org.elasticsearch.xpack.ml.forecast.quality.action.TransportForecastEvaluateAction;
+import org.elasticsearch.xpack.ml.forecast.quality.rest.action.RestForecastEvaluateAction;
 
 import java.util.List;
 import java.util.function.Supplier;
