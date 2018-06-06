@@ -4,10 +4,10 @@
  * you may not use this file except in compliance with the Elastic License.
  */
 
-package org.elasticsearch.xpack.ml_forecastquality.calculator;
+package org.elasticsearch.xpack.ml.forecast.quality.calculator;
 
-import org.elasticsearch.xpack.ml_forecastquality.extractor.ErrorBar;
-import org.elasticsearch.xpack.ml_forecastquality.extractor.ErrorBarExtractor;
+import org.elasticsearch.xpack.ml.forecast.quality.extractor.ErrorBar;
+import org.elasticsearch.xpack.ml.forecast.quality.extractor.ErrorBarExtractor;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -51,8 +51,16 @@ public class AccuracyCalculator {
                 actuals.add(baselineValue);
                 compareValues.add(compareValue);
                 double error = baselineValue - compareValue;
-                double relativeError = (baselineValue - compareValue) / baselineValue;
+                double relativeError;
 
+                // handle baselineValue == 0
+                if (baselineValue != 0) {
+                    relativeError = (baselineValue - compareValue) / baselineValue;
+                } else if (baselineValue == compareValue) {
+                    relativeError = 0;
+                } else {
+                    relativeError = 1;
+                }
                 errors.add(error);
                 absoluteErrors.add(Math.abs(error));
 
@@ -60,12 +68,22 @@ public class AccuracyCalculator {
                 relativeAbsoluteErrors.add(Math.abs(relativeError));
 
                 // for SMAPE
-                symetricAbsolutePercentageErrors.add(Math.abs(error) / (Math.abs(baselineValue) + Math.abs(compareValue) / 2));
+                if (baselineValue != 0) {
+                    symetricAbsolutePercentageErrors.add(Math.abs(error) / (Math.abs(baselineValue) + Math.abs(compareValue) / 2));
+                } else if (baselineValue == compareValue) {
+                    symetricAbsolutePercentageErrors.add(0.0);
+                } else {
+                    symetricAbsolutePercentageErrors.add(1.0);
+                }
 
                 if (totalCount > 0) {
                     // for MASE
                     maseDenominator.add(Math.abs(baselineValue - baselinePredecessor));
-                    maseSmoothedErrors.add(Math.abs(error) / calculateMean(maseDenominator));
+                    double mean = calculateMean(maseDenominator);
+
+                    if (mean > 0) {
+                        maseSmoothedErrors.add(Math.abs(error) / mean);
+                    }
                 }
                 ++totalCount;
                 baselinePredecessor = baselineValue;
@@ -81,9 +99,9 @@ public class AccuracyCalculator {
 
         double symetricMeanAbsolutePercentageError = calculateMean(symetricAbsolutePercentageErrors);
         double meanAbsoluteScaledError = calculateMean(maseSmoothedErrors);
-        long analyzedTimeInSeconds = baseline.getBucketSpan().getSeconds() * totalCount;
+        long analyzedTimeInMillis = baseline.getBucketSpan().getMillis() * totalCount;
 
-        return new AccuracyMeasure(totalCount, analyzedTimeInSeconds, meanAbsoluteError, meanAbsolutePercentageError,
+        return new AccuracyMeasure(totalCount, analyzedTimeInMillis, meanAbsoluteError, meanAbsolutePercentageError,
                 medianAbsolutePercentageError, symetricMeanAbsolutePercentageError, meanAbsoluteScaledError);
     }
 

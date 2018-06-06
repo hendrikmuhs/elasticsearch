@@ -4,7 +4,7 @@
  * you may not use this file except in compliance with the Elastic License.
  */
 
-package org.elasticsearch.xpack.ml_forecastquality.action;
+package org.elasticsearch.xpack.ml.forecast.quality.action;
 
 import org.elasticsearch.action.Action;
 import org.elasticsearch.action.ActionRequest;
@@ -21,24 +21,19 @@ import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.xpack.core.ml.job.config.Job;
 import org.elasticsearch.xpack.core.ml.utils.ExceptionsHelper;
-import org.elasticsearch.xpack.ml_forecastquality.calculator.AccuracyMeasure;
+import org.elasticsearch.xpack.ml.forecast.quality.calculator.AccuracyMeasure;
 
 import java.io.IOException;
 import java.util.Objects;
 
 public class ForecastEvaluateAction
-        extends Action<ForecastEvaluateAction.Request, ForecastEvaluateAction.Response, ForecastEvaluateAction.RequestBuilder> {
+        extends Action<ForecastEvaluateAction.Request, ForecastEvaluateAction.Response> {
 
     public static final ForecastEvaluateAction INSTANCE = new ForecastEvaluateAction();
-    public static final String NAME = "cluster:admin/xpack/ml/job/forecast_evaluate";
+    public static final String NAME = "cluster:monitor/xpack/ml/job/forecast_evaluate";
 
     private ForecastEvaluateAction() {
         super(NAME);
-    }
-
-    @Override
-    public RequestBuilder newRequestBuilder(ElasticsearchClient client) {
-        return new RequestBuilder(client, this);
     }
 
     @Override
@@ -135,7 +130,7 @@ public class ForecastEvaluateAction
         }
     }
 
-    static class RequestBuilder extends ActionRequestBuilder<Request, Response, RequestBuilder> {
+    static class RequestBuilder extends ActionRequestBuilder<Request, Response> {
 
         RequestBuilder(ElasticsearchClient client, ForecastEvaluateAction action) {
             super(client, action, new Request());
@@ -145,7 +140,7 @@ public class ForecastEvaluateAction
     public static class Response extends ActionResponse implements ToXContentObject {
 
         private int count;
-        private long timeSpanInSeconds;
+        private long timeSpanInMillis;
         private long tookInMillis;
         private double meanAbsoluteError;
         private double meanAbsolutePercentageError;
@@ -158,7 +153,7 @@ public class ForecastEvaluateAction
         public Response(AccuracyMeasure accuracyMeasure, long tookInMillis) {
             super();
             this.count = accuracyMeasure.getCount();
-            this.timeSpanInSeconds = accuracyMeasure.getTimeSpanInSeconds();
+            this.timeSpanInMillis = accuracyMeasure.getTimeSpanInSeconds();
             this.meanAbsoluteError = accuracyMeasure.getMeanAbsoluteError();
             this.meanAbsolutePercentageError = accuracyMeasure.getMeanAbsolutePercentageError();
             this.medianAbsolutePercentageError = accuracyMeasure.getMedianAbsolutePercentageError();
@@ -169,7 +164,7 @@ public class ForecastEvaluateAction
         public void readFrom(StreamInput in) throws IOException {
             super.readFrom(in);
             this.count = in.readInt();
-            this.timeSpanInSeconds = in.readLong();
+            this.timeSpanInMillis = in.readLong();
             this.meanAbsoluteError = in.readDouble();
             this.meanAbsolutePercentageError = in.readDouble();
             this.medianAbsolutePercentageError = in.readDouble();
@@ -180,7 +175,7 @@ public class ForecastEvaluateAction
         public void writeTo(StreamOutput out) throws IOException {
             super.writeTo(out);
             out.writeInt(count);
-            out.writeLong(timeSpanInSeconds);
+            out.writeLong(timeSpanInMillis);
             out.writeDouble(meanAbsoluteError);
             out.writeDouble(meanAbsolutePercentageError);
             out.writeDouble(medianAbsolutePercentageError);
@@ -191,7 +186,7 @@ public class ForecastEvaluateAction
         public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
             builder.startObject();
             builder.field("count", count);
-            builder.field("time_span", timeSpanInSeconds);
+            builder.field("time_span", timeSpanInMillis);
             builder.field("mean_absolute_error", meanAbsoluteError);
             builder.field("mean_absolute_percentage_error", meanAbsolutePercentageError);
             builder.field("median_absolute_percentage_error", medianAbsolutePercentageError);
@@ -210,7 +205,7 @@ public class ForecastEvaluateAction
             }
             Response other = (Response) obj;
             return this.count == other.count 
-                    && this.timeSpanInSeconds == other.timeSpanInSeconds
+                    && this.timeSpanInMillis == other.timeSpanInMillis
                     && this.tookInMillis == other.tookInMillis
                     && this.meanAbsoluteError == other.meanAbsoluteError
                     && this.meanAbsolutePercentageError == other.meanAbsolutePercentageError
@@ -219,7 +214,7 @@ public class ForecastEvaluateAction
 
         @Override
         public int hashCode() {
-            return Objects.hash(count, timeSpanInSeconds, meanAbsoluteError, meanAbsolutePercentageError, medianAbsolutePercentageError,
+            return Objects.hash(count, timeSpanInMillis, meanAbsoluteError, meanAbsolutePercentageError, medianAbsolutePercentageError,
                     tookInMillis);
         }
     }

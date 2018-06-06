@@ -8,7 +8,7 @@ package org.elasticsearch.xpack.ml_forecastquality.action;
 
 import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.test.AbstractStreamableXContentTestCase;
-import org.elasticsearch.xpack.ml_forecastquality.action.ForecastEvaluateAction.Request;
+import org.elasticsearch.xpack.ml.forecast.quality.action.ForecastEvaluateAction.Request;
 
 public class ForecastEvaluateActionRequestTests extends AbstractStreamableXContentTestCase<Request> {
 
