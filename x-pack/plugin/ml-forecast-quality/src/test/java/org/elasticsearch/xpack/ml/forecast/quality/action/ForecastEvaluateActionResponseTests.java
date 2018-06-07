@@ -4,11 +4,13 @@
  * you may not use this file except in compliance with the Elastic License.
  */
 
-package org.elasticsearch.xpack.ml_forecastquality.action;
+package org.elasticsearch.xpack.ml.forecast.quality.action;
 
 import org.elasticsearch.test.AbstractStreamableTestCase;
 import org.elasticsearch.xpack.ml.forecast.quality.action.ForecastEvaluateAction.Response;
 import org.elasticsearch.xpack.ml.forecast.quality.calculator.AccuracyMeasure;
+
+import java.time.Duration;
 
 public class ForecastEvaluateActionResponseTests extends AbstractStreamableTestCase<Response> {
 
@@ -19,9 +21,9 @@ public class ForecastEvaluateActionResponseTests extends AbstractStreamableTestC
 
     @Override
     protected Response createTestInstance() {
-        AccuracyMeasure accuracyMeasure = new AccuracyMeasure(randomInt(), randomLong(), randomDouble(), randomDouble(), randomDouble(),
-                randomDouble(), randomDouble());
-        return new Response(accuracyMeasure, randomLong());
+        AccuracyMeasure accuracyMeasure = new AccuracyMeasure(randomInt(), Duration.ofMillis(randomLong()), randomDouble(), randomDouble(),
+                randomDouble(), randomLong(), randomDouble());
+        return new Response(accuracyMeasure, Duration.ofMillis(randomLong()));
     }
 
 }

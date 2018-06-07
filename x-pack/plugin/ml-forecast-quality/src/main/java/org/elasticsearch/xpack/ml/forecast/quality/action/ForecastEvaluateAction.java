@@ -24,10 +24,10 @@ import org.elasticsearch.xpack.core.ml.utils.ExceptionsHelper;
 import org.elasticsearch.xpack.ml.forecast.quality.calculator.AccuracyMeasure;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Objects;
 
-public class ForecastEvaluateAction
-        extends Action<ForecastEvaluateAction.Request, ForecastEvaluateAction.Response> {
+public class ForecastEvaluateAction extends Action<ForecastEvaluateAction.Request, ForecastEvaluateAction.Response> {
 
     public static final ForecastEvaluateAction INSTANCE = new ForecastEvaluateAction();
     public static final String NAME = "cluster:monitor/xpack/ml/job/forecast_evaluate";
@@ -140,8 +140,8 @@ public class ForecastEvaluateAction
     public static class Response extends ActionResponse implements ToXContentObject {
 
         private int count;
-        private long timeSpanInMillis;
-        private long tookInMillis;
+        private Duration timeSpan;
+        private Duration took;
         private double meanAbsoluteError;
         private double meanAbsolutePercentageError;
         private double medianAbsolutePercentageError;
@@ -150,47 +150,47 @@ public class ForecastEvaluateAction
             super();
         }
 
-        public Response(AccuracyMeasure accuracyMeasure, long tookInMillis) {
+        public Response(AccuracyMeasure accuracyMeasure, Duration took) {
             super();
             this.count = accuracyMeasure.getCount();
-            this.timeSpanInMillis = accuracyMeasure.getTimeSpanInSeconds();
+            this.timeSpan = accuracyMeasure.getTimeSpan();
             this.meanAbsoluteError = accuracyMeasure.getMeanAbsoluteError();
             this.meanAbsolutePercentageError = accuracyMeasure.getMeanAbsolutePercentageError();
             this.medianAbsolutePercentageError = accuracyMeasure.getMedianAbsolutePercentageError();
-            this.tookInMillis = tookInMillis;
+            this.took = took;
         }
 
         @Override
         public void readFrom(StreamInput in) throws IOException {
             super.readFrom(in);
             this.count = in.readInt();
-            this.timeSpanInMillis = in.readLong();
+            this.timeSpan = Duration.ofMillis(in.readLong());
             this.meanAbsoluteError = in.readDouble();
             this.meanAbsolutePercentageError = in.readDouble();
             this.medianAbsolutePercentageError = in.readDouble();
-            this.tookInMillis = in.readLong();
+            this.took = Duration.ofMillis(in.readLong());
         }
 
         @Override
         public void writeTo(StreamOutput out) throws IOException {
             super.writeTo(out);
             out.writeInt(count);
-            out.writeLong(timeSpanInMillis);
+            out.writeLong(timeSpan.toMillis());
             out.writeDouble(meanAbsoluteError);
             out.writeDouble(meanAbsolutePercentageError);
             out.writeDouble(medianAbsolutePercentageError);
-            out.writeLong(tookInMillis);
+            out.writeLong(took.toMillis());
         }
 
         @Override
         public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
             builder.startObject();
             builder.field("count", count);
-            builder.field("time_span", timeSpanInMillis);
+            builder.field("time_span", timeSpan.toMillis());
             builder.field("mean_absolute_error", meanAbsoluteError);
             builder.field("mean_absolute_percentage_error", meanAbsolutePercentageError);
             builder.field("median_absolute_percentage_error", medianAbsolutePercentageError);
-            builder.field("took", tookInMillis);
+            builder.field("took", took.toMillis());
             builder.endObject();
             return builder;
         }
@@ -204,9 +204,7 @@ public class ForecastEvaluateAction
                 return false;
             }
             Response other = (Response) obj;
-            return this.count == other.count 
-                    && this.timeSpanInMillis == other.timeSpanInMillis
-                    && this.tookInMillis == other.tookInMillis
+            return this.count == other.count && this.timeSpan == other.timeSpan && this.took == other.took
                     && this.meanAbsoluteError == other.meanAbsoluteError
                     && this.meanAbsolutePercentageError == other.meanAbsolutePercentageError
                     && this.medianAbsolutePercentageError == other.medianAbsolutePercentageError;
@@ -214,8 +212,7 @@ public class ForecastEvaluateAction
 
         @Override
         public int hashCode() {
-            return Objects.hash(count, timeSpanInMillis, meanAbsoluteError, meanAbsolutePercentageError, medianAbsolutePercentageError,
-                    tookInMillis);
+            return Objects.hash(count, timeSpan, meanAbsoluteError, meanAbsolutePercentageError, medianAbsolutePercentageError, took);
         }
     }
 }

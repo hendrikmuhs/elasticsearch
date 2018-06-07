@@ -9,9 +9,25 @@ package org.elasticsearch.xpack.ml.forecast.quality.calculator;
 import org.elasticsearch.xpack.ml.forecast.quality.extractor.ErrorBar;
 import org.elasticsearch.xpack.ml.forecast.quality.extractor.ErrorBarExtractor;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Compares 2 time lines and computes various scores
+ *
+ * As algorithms share common parts this is all stuffed together right now instead
+ * of implementing them separately. Todo: Find a way to abstract calculations without
+ * lossing performance.
+ *
+ * Implemented algorithms:
+ *
+ * https://en.wikipedia.org/wiki/Mean_absolute_error
+ * https://en.wikipedia.org/wiki/Mean_absolute_percentage_error
+ *  + median absolute percentage error
+ * https://en.wikipedia.org/wiki/Symmetric_mean_absolute_percentage_error
+ * https://en.wikipedia.org/wiki/Mean_absolute_scaled_error
+ */
 public class AccuracyCalculator {
 
     private static final int BATCH_SIZE = 100;
@@ -99,9 +115,9 @@ public class AccuracyCalculator {
 
         double symetricMeanAbsolutePercentageError = calculateMean(symetricAbsolutePercentageErrors);
         double meanAbsoluteScaledError = calculateMean(maseSmoothedErrors);
-        long analyzedTimeInMillis = baseline.getBucketSpan().getMillis() * totalCount;
+        Duration analyzedTimeSpan = Duration.ofMillis(baseline.getBucketSpan().getMillis() * totalCount);
 
-        return new AccuracyMeasure(totalCount, analyzedTimeInMillis, meanAbsoluteError, meanAbsolutePercentageError,
+        return new AccuracyMeasure(totalCount, analyzedTimeSpan, meanAbsoluteError, meanAbsolutePercentageError,
                 medianAbsolutePercentageError, symetricMeanAbsolutePercentageError, meanAbsoluteScaledError);
     }
 

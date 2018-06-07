@@ -6,19 +6,24 @@
 
 package org.elasticsearch.xpack.ml.forecast.quality.calculator;
 
+import java.time.Duration;
+
+/**
+ * Utility class to hold results from the accuracy calculation
+ */
 public class AccuracyMeasure {
     private final int count;
-    private final long timeSpanInMillis;
+    private final Duration timeSpan;
     private final double meanAbsoluteError;
     private final double meanAbsolutePercentageError;
     private final double medianAbsolutePercentageError;
     private final double symetricMeanAbsolutePercentageError;
     private final double meanAbsoluteScaledError;
 
-    public AccuracyMeasure(int count, long timeSpanInSeconds, double meanAbsoluteError, double meanAbsolutePercentageError,
+    public AccuracyMeasure(int count, Duration timeSpan, double meanAbsoluteError, double meanAbsolutePercentageError,
             double medianAbsolutePercentageError, double symetricmeanAbsolutePercentageError, double meanAbsoluteScaledError) {
         this.count = count;
-        this.timeSpanInMillis = timeSpanInSeconds;
+        this.timeSpan = timeSpan;
         this.meanAbsoluteError = meanAbsoluteError;
         this.meanAbsolutePercentageError = meanAbsolutePercentageError;
         this.medianAbsolutePercentageError = medianAbsolutePercentageError;
@@ -30,8 +35,8 @@ public class AccuracyMeasure {
         return count;
     }
 
-    public long getTimeSpanInSeconds() {
-        return timeSpanInMillis;
+    public Duration getTimeSpan() {
+        return timeSpan;
     }
 
     public double getMeanAbsoluteError() {

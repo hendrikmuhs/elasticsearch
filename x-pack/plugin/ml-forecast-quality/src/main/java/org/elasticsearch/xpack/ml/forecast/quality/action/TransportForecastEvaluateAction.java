@@ -45,6 +45,7 @@ import org.elasticsearch.xpack.ml.forecast.quality.extractor.ModelPlotErrorBarEx
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -127,7 +128,7 @@ public class TransportForecastEvaluateAction
                             startTime, endTime, job.getAnalysisConfig().getBucketSpan());
 
                     AccuracyMeasure scores = AccuracyCalculator.compare(modelPlotExtractor, forecastExtractor);
-                    long took = threadPool.relativeTimeInMillis() - this.startTime;
+                    Duration took = Duration.ofMillis(threadPool.relativeTimeInMillis() - this.startTime);
                     listener.onResponse(new ForecastEvaluateAction.Response(scores, took));
                 }
             }, errorResponse -> {

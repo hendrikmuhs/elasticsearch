@@ -29,51 +29,41 @@ import org.elasticsearch.xpack.core.ml.utils.MlIndicesUtils;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 
-public class ForecastErrorBarExtractor extends BatchErrorBarExtractor {
+public class ForecastErrorBarExtractor extends AbstractIndexBasedErrorBarExtractor {
 
-    private static final String EPOCH_SECONDS = "epoch_second";
-
-    private final Client client;
-    private final String indexName;
+    private final BoolQueryBuilder forecastResultsQueryTemplate;
 
     public ForecastErrorBarExtractor(Client client, String indexName, Instant startTime, Instant endTime, TimeValue bucketSpan) {
-        super(startTime, endTime, bucketSpan);
-        this.client = client;
-        this.indexName = indexName;
+        super(client, indexName, startTime, endTime, bucketSpan);
+        QueryBuilder termQuery = new TermsQueryBuilder(Result.RESULT_TYPE.getPreferredName(), Forecast.RESULT_TYPE_VALUE);
+        forecastResultsQueryTemplate = new BoolQueryBuilder().filter(termQuery);
     }
 
     @Override
     public List<ErrorBar> doNext(Instant startBatch, Instant endBatch, int batchSize) {
-        SearchResponse searchResponse;
         QueryBuilder timeQuery = new RangeQueryBuilder(Result.TIMESTAMP.getPreferredName()).gte(startBatch.getEpochSecond())
                 .lt(endBatch.getEpochSecond()).format(EPOCH_SECONDS);
-        QueryBuilder termQuery = new TermsQueryBuilder(Result.RESULT_TYPE.getPreferredName(), Forecast.RESULT_TYPE_VALUE);
+        QueryBuilder forecastQuery = forecastResultsQueryTemplate.filter(timeQuery);
 
-        QueryBuilder forecastQuery = new BoolQueryBuilder().filter(termQuery).filter(timeQuery);
-
-        searchResponse = client.prepareSearch(indexName)
+        SearchResponse searchResponse = client.prepareSearch(indexName)
                 .setIndicesOptions(MlIndicesUtils.addIgnoreUnavailable(SearchRequest.DEFAULT_INDICES_OPTIONS)).setQuery(forecastQuery)
                 .setSize(batchSize).get();
-        
-        List<ErrorBar> results = new ArrayList<>();
 
-        for (SearchHit hit : searchResponse.getHits().getHits()) {
-            BytesReference source = hit.getSourceRef();
-            try (InputStream stream = source.streamInput();
-                    XContentParser parser = XContentFactory.xContent(XContentType.JSON)
-                            .createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE, stream)) {
-                Forecast forecast = Forecast.STRICT_PARSER.apply(parser, null);
-                results.add(new ErrorBar(forecast.getTimestamp(), forecast.getForecastPrediction(), forecast.getForecastLower(),
-                        forecast.getForecastUpper()));
-            } catch (IOException e) {
-                throw new ElasticsearchParseException("failed to parse forecast", e);
-            }
-        }
-
-        return results;
+        return exractSearchHits(searchResponse, hit -> parse(hit));
     }
 
+    private ErrorBar parse(SearchHit hit) {
+        BytesReference source = hit.getSourceRef();
+        try (InputStream stream = source.streamInput();
+                XContentParser parser = XContentFactory.xContent(XContentType.JSON).createParser(NamedXContentRegistry.EMPTY,
+                        LoggingDeprecationHandler.INSTANCE, stream)) {
+            Forecast forecast = Forecast.STRICT_PARSER.apply(parser, null);
+            return new ErrorBar(forecast.getTimestamp(), forecast.getForecastPrediction(), forecast.getForecastLower(),
+                    forecast.getForecastUpper());
+        } catch (IOException e) {
+            throw new ElasticsearchParseException("failed to parse forecast", e);
+        }
+    }
 }

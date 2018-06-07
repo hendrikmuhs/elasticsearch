@@ -31,54 +31,44 @@ import org.elasticsearch.xpack.core.ml.utils.MlIndicesUtils;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 
-public class ModelPlotErrorBarExtractor extends BatchErrorBarExtractor {
+public class ModelPlotErrorBarExtractor extends AbstractIndexBasedErrorBarExtractor {
     private static final String EPOCH_SECONDS = "epoch_second";
 
-    private final Client client;
-    private final String indexName;
-    private final String jobName;
+    private final BoolQueryBuilder modelPlotQueryTemplate;
 
     public ModelPlotErrorBarExtractor(Client client, String indexName, String jobName, Instant startTime, Instant endTime,
             TimeValue bucketSpan) {
-        super(startTime, endTime, bucketSpan);
-        this.client = client;
-        this.indexName = indexName;
-        this.jobName = jobName;
+        super(client, indexName, startTime, endTime, bucketSpan);
+        QueryBuilder termQuery = new TermsQueryBuilder(Result.RESULT_TYPE.getPreferredName(), ModelPlot.RESULT_TYPE_VALUE);
+        QueryBuilder jobQuery = new TermsQueryBuilder(Job.ID.getPreferredName(), jobName);
+        modelPlotQueryTemplate = new BoolQueryBuilder().filter(termQuery).filter(jobQuery);
     }
 
     @Override
     public List<ErrorBar> doNext(Instant startBatch, Instant endBatch, int batchSize) {
-
-        SearchResponse searchResponse;
         QueryBuilder timeQuery = new RangeQueryBuilder(Result.TIMESTAMP.getPreferredName()).gte(startBatch.getEpochSecond())
                 .lt(endBatch.getEpochSecond()).format(EPOCH_SECONDS);
-        QueryBuilder termQuery = new TermsQueryBuilder(Result.RESULT_TYPE.getPreferredName(), ModelPlot.RESULT_TYPE_VALUE);
-        QueryBuilder jobQuery = new TermsQueryBuilder(Job.ID.getPreferredName(), jobName);
 
-        QueryBuilder modelPlotQuery = new BoolQueryBuilder().filter(termQuery).filter(jobQuery).filter(timeQuery);
+        QueryBuilder modelPlotQuery = modelPlotQueryTemplate.filter(timeQuery);
 
-        searchResponse = client.prepareSearch(indexName)
+        SearchResponse searchResponse = client.prepareSearch(indexName)
                 .setIndicesOptions(MlIndicesUtils.addIgnoreUnavailable(SearchRequest.DEFAULT_INDICES_OPTIONS)).setQuery(modelPlotQuery)
                 .setSize(batchSize).addSort(Result.TIMESTAMP.getPreferredName(), SortOrder.ASC).get();
 
-        List<ErrorBar> results = new ArrayList<>();
+        return exractSearchHits(searchResponse, hit -> parse(hit));
+    }
 
-        for (SearchHit hit : searchResponse.getHits().getHits()) {
-            BytesReference source = hit.getSourceRef();
-            try (InputStream stream = source.streamInput();
-                    XContentParser parser = XContentFactory.xContent(XContentType.JSON).createParser(NamedXContentRegistry.EMPTY,
-                            LoggingDeprecationHandler.INSTANCE, stream)) {
-                ModelPlot modelPlot = ModelPlot.LENIENT_PARSER.apply(parser, null);
-                results.add(new ErrorBar(modelPlot.getTimestamp(), modelPlot.getActual(), modelPlot.getModelLower(),
-                        modelPlot.getModelUpper()));
-            } catch (IOException e) {
-                throw new ElasticsearchParseException("failed to parse modelPlot", e);
-            }
+    private ErrorBar parse(SearchHit hit) {
+        BytesReference source = hit.getSourceRef();
+        try (InputStream stream = source.streamInput();
+                XContentParser parser = XContentFactory.xContent(XContentType.JSON).createParser(NamedXContentRegistry.EMPTY,
+                        LoggingDeprecationHandler.INSTANCE, stream)) {
+            ModelPlot modelPlot = ModelPlot.LENIENT_PARSER.apply(parser, null);
+            return new ErrorBar(modelPlot.getTimestamp(), modelPlot.getActual(), modelPlot.getModelLower(), modelPlot.getModelUpper());
+        } catch (IOException e) {
+            throw new ElasticsearchParseException("failed to parse modelPlot", e);
         }
-
-        return results;
     }
 }
