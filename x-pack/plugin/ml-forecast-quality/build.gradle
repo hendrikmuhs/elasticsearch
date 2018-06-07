@@ -7,7 +7,7 @@ apply plugin: 'elasticsearch.esplugin'
 esplugin {
   name 'ml-forecast-quality'
   description 'A plugin to measure forecast quality'
-  classname 'org.elasticsearch.xpack.ml_forecastquality.ForecastQuality'
+  classname 'org.elasticsearch.xpack.ml.forecast.quality.ForecastQuality'
   extendedPlugins = ['x-pack-core']
 }
 
