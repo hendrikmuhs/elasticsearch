@@ -27,7 +27,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.Objects;
 
-public class ForecastEvaluateAction extends Action<ForecastEvaluateAction.Request, ForecastEvaluateAction.Response> {
+public class ForecastEvaluateAction extends Action<ForecastEvaluateAction.Response> {
 
     public static final ForecastEvaluateAction INSTANCE = new ForecastEvaluateAction();
     public static final String NAME = "cluster:monitor/xpack/ml/job/forecast_evaluate";

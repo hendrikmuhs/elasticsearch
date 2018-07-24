@@ -26,6 +26,7 @@ import org.elasticsearch.common.xcontent.NamedXContentRegistry;
 import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.common.xcontent.XContentType;
+import org.elasticsearch.tasks.Task;
 import org.elasticsearch.threadpool.ThreadPool;
 import org.elasticsearch.threadpool.ThreadPool.Names;
 import org.elasticsearch.transport.TransportService;
@@ -59,24 +60,24 @@ public class TransportForecastEvaluateAction
 
     private final Client client;
     private final ClusterService clusterService;
+    private final ThreadPool threadPool;
 
     @Inject
     public TransportForecastEvaluateAction(Settings settings, String actionName, ThreadPool threadPool, TransportService transportService,
-            ActionFilters actionFilters, IndexNameExpressionResolver indexNameExpressionResolver, ClusterService clusterService,
-            Client client) {
-        super(settings, actionName, threadPool, transportService, actionFilters, indexNameExpressionResolver,
-                ForecastEvaluateAction.Request::new);
+            ActionFilters actionFilters, ClusterService clusterService, Client client) {
+        super(settings, actionName, transportService, actionFilters, ForecastEvaluateAction.Request::new);
         this.client = client;
         this.clusterService = clusterService;
+        this.threadPool = threadPool;
     }
 
     @Override
-    protected void doExecute(Request request, ActionListener<Response> listener) {
+    protected void doExecute(Task task, Request request, ActionListener<Response> listener) {
         threadPool.executor(Names.GENERIC).execute(() -> {
             new AsyncForecastEvaluateAction(request, listener).start();
         });
     }
-
+    
     class AsyncForecastEvaluateAction {
 
         private final Request request;
