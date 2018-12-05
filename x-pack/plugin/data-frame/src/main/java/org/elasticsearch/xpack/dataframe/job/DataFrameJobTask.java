@@ -81,7 +81,7 @@ public class DataFrameJobTask extends AllocatedPersistentTask implements Schedul
     }
 
     @Override
-    public void triggered(Event event) {
+    public synchronized void triggered(Event event) {
         if (event.getJobName().equals(SCHEDULE_NAME + "_" + job.getConfig().getId())) {
             logger.debug(
                     "Data frame indexer [" + event.getJobName() + "] schedule has triggered, state: [" + indexer.getState() + "]");
