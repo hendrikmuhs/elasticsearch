@@ -157,17 +157,23 @@ public class DataFrameJobTask extends AllocatedPersistentTask implements Schedul
             if (indexerState.equals(IndexerState.ABORTING)) {
                 // If we're aborting, just invoke `next` (which is likely an onFailure handler)
                 next.run();
-            } else {
-                final DataFrameJobState state = new DataFrameJobState(indexerState, getPosition());
-                logger.info("Updating persistent state of job [" + job.getConfig().getId() + "] to [" + state.toString() + "]");
-
-                // TODO: we can not persist the state right now, need to be called from the task
-                updatePersistentTaskState(state, ActionListener.wrap(task -> next.run(), exc -> {
-                    // We failed to update the persistent task for some reason,
-                    // set our flag back to what it was before
-                    next.run();
-                }));
+                return;
             }
+
+            if(indexerState.equals(IndexerState.STARTED)) {
+                // if the indexer resets the state to started, it means it is done, so increment the generation
+                generation.compareAndSet(0l, 1l);
+            }
+
+            final DataFrameJobState state = new DataFrameJobState(indexerState, getPosition(), generation.get());
+            logger.info("Updating persistent state of job [" + job.getConfig().getId() + "] to [" + state.toString() + "]");
+
+            // TODO: we can not persist the state right now, need to be called from the task
+            updatePersistentTaskState(state, ActionListener.wrap(task -> next.run(), exc -> {
+                // We failed to update the persistent task for some reason,
+                // set our flag back to what it was before
+                next.run();
+            }));
         }
 
         @Override
