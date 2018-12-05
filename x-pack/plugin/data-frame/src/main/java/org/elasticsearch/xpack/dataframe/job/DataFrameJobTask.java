@@ -40,6 +40,11 @@ public class DataFrameJobTask extends AllocatedPersistentTask implements Schedul
     private final ThreadPool threadPool;
     private final DataFrameIndexer indexer;
 
+    // the generation of this data frame, for v1 there will be only
+    // 0: data frame not created or still indexing
+    // 1: data frame complete, all data has been indexed
+    private final AtomicReference<Long> generation;
+
     static final String SCHEDULE_NAME = DataFrame.TASK_NAME + "/schedule";
 
     public DataFrameJobTask(long id, String type, String action, TaskId parentTask, DataFrameJob job,
@@ -54,6 +59,7 @@ public class DataFrameJobTask extends AllocatedPersistentTask implements Schedul
         IndexerState initialState = IndexerState.STOPPED;
         Map<String, Object> initialPosition = null;
         this.indexer = new ClientDataFrameIndexer(job, new AtomicReference<>(initialState), initialPosition, client);
+        this.generation = new AtomicReference<>();
     }
 
     public DataFrameJobConfig getConfig() {
@@ -61,11 +67,15 @@ public class DataFrameJobTask extends AllocatedPersistentTask implements Schedul
     }
 
     public DataFrameJobState getState() {
-        return new DataFrameJobState(indexer.getState(), indexer.getPosition());
+        return new DataFrameJobState(indexer.getState(), indexer.getPosition(), generation.get());
     }
 
     public DataFrameIndexerJobStats getStats() {
         return indexer.getStats();
+    }
+
+    public long getGeneration() {
+        return generation.get();
     }
 
     public synchronized void start(ActionListener<Response> listener) {
