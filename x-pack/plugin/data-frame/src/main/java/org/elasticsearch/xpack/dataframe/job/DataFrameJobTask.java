@@ -59,11 +59,19 @@ public class DataFrameJobTask extends AllocatedPersistentTask implements Schedul
         IndexerState initialState = IndexerState.STOPPED;
         Map<String, Object> initialPosition = null;
         this.indexer = new ClientDataFrameIndexer(job, new AtomicReference<>(initialState), initialPosition, client);
-        this.generation = new AtomicReference<>();
+        this.generation = new AtomicReference<>(0l);
     }
 
     public DataFrameJobConfig getConfig() {
         return job.getConfig();
+    }
+
+    /**
+     * Enable Task API to return detailed status information
+     */
+    @Override
+    public Status getStatus() {
+        return getState();
     }
 
     public DataFrameJobState getState() {
@@ -92,9 +100,8 @@ public class DataFrameJobTask extends AllocatedPersistentTask implements Schedul
 
     @Override
     public synchronized void triggered(Event event) {
-        if (event.getJobName().equals(SCHEDULE_NAME + "_" + job.getConfig().getId())) {
-            logger.debug(
-                    "Data frame indexer [" + event.getJobName() + "] schedule has triggered, state: [" + indexer.getState() + "]");
+        if (generation.get() == 0 && event.getJobName().equals(SCHEDULE_NAME + "_" + job.getConfig().getId())) {
+            logger.debug("Data frame indexer [" + event.getJobName() + "] schedule has triggered, state: [" + indexer.getState() + "]");
             indexer.maybeTriggerAsyncJob(System.currentTimeMillis());
         }
     }
