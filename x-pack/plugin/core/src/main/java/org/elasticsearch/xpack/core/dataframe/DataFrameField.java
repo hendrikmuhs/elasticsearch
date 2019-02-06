@@ -29,6 +29,12 @@ public final class DataFrameField {
     // note: this is used to match tasks
     public static final String PERSISTENT_TASK_DESCRIPTION_PREFIX = "data_frame_";
 
+    /**
+     * Parameter to indicate whether we are serialising to X Content for internal storage. Default the field is invisible (e.g. for get
+     * API's)
+     */
+    public static final String FOR_INTERNAL_STORAGE = "for_internal_storage";
+
     private DataFrameField() {
     }
 }
