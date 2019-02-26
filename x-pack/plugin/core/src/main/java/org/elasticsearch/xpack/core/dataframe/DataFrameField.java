@@ -46,6 +46,7 @@ public final class DataFrameField {
      * API's)
      */
     public static final String FOR_INTERNAL_STORAGE = "for_internal_storage";
+    public static final String INCLUDE_TYPE = "include_type";
 
     private DataFrameField() {
     }
