@@ -36,7 +36,6 @@ import static org.elasticsearch.common.xcontent.ConstructingObjectParser.optiona
  */
 public class DataFrameTransformConfig extends AbstractDiffable<DataFrameTransformConfig> implements Writeable, ToXContentObject {
 
-    public static final String NAME = "data_frame_transforms";
     public static final ParseField HEADERS = new ParseField("headers");
     public static final ParseField SOURCE = new ParseField("source");
     public static final ParseField DESTINATION = new ParseField("dest");
@@ -44,6 +43,8 @@ public class DataFrameTransformConfig extends AbstractDiffable<DataFrameTransfor
 
     // types of transforms
     public static final ParseField PIVOT_TRANSFORM = new ParseField("pivot");
+
+    private  static final String NAME = "data_frame_transforms_config";
 
     private static final ConstructingObjectParser<DataFrameTransformConfig, String> STRICT_PARSER = createParser(false);
     private static final ConstructingObjectParser<DataFrameTransformConfig, String> LENIENT_PARSER = createParser(true);
@@ -66,24 +67,26 @@ public class DataFrameTransformConfig extends AbstractDiffable<DataFrameTransfor
                     String source = (String) args[1];
                     String dest = (String) args[2];
 
+                    // ignored, only for internal storage: String docType = (String) args[3];
+
                     // on strict parsing do not allow injection of headers
-                    if (lenient == false && args[3] != null) {
+                    if (lenient == false && args[4] != null) {
                         throw new IllegalArgumentException("Found [headers], not allowed for strict parsing");
                     }
 
                     @SuppressWarnings("unchecked")
-                    Map<String, String> headers = (Map<String, String>) args[3];
+                    Map<String, String> headers = (Map<String, String>) args[4];
 
                     // default handling: if the user does not specify a query, we default to match_all
                     QueryConfig queryConfig = null;
-                    if (args[4] == null) {
+                    if (args[5] == null) {
                         queryConfig = new QueryConfig(Collections.singletonMap(MatchAllQueryBuilder.NAME, Collections.emptyMap()),
                                 new MatchAllQueryBuilder());
                     } else {
-                        queryConfig = (QueryConfig) args[4];
+                        queryConfig = (QueryConfig) args[5];
                     }
 
-                    PivotConfig pivotConfig = (PivotConfig) args[5];
+                    PivotConfig pivotConfig = (PivotConfig) args[6];
                     return new DataFrameTransformConfig(id, source, dest, headers, queryConfig, pivotConfig);
                 });
 
@@ -91,6 +94,7 @@ public class DataFrameTransformConfig extends AbstractDiffable<DataFrameTransfor
         parser.declareString(constructorArg(), SOURCE);
         parser.declareString(constructorArg(), DESTINATION);
 
+        parser.declareString(optionalConstructorArg(), DataFrameField.INDEX_DOC_TYPE);
         parser.declareObject(optionalConstructorArg(), (p, c) -> p.mapStrings(), HEADERS);
         parser.declareObject(optionalConstructorArg(), (p, c) -> QueryConfig.fromXContent(p, lenient), QUERY);
         parser.declareObject(optionalConstructorArg(), (p, c) -> PivotConfig.fromXContent(p, lenient), PIVOT_TRANSFORM);
@@ -99,7 +103,7 @@ public class DataFrameTransformConfig extends AbstractDiffable<DataFrameTransfor
     }
 
     public static String documentId(String transformId) {
-        return "data_frame-" + transformId;
+        return NAME + "-" + transformId;
     }
 
     public DataFrameTransformConfig(final String id,
@@ -196,6 +200,9 @@ public class DataFrameTransformConfig extends AbstractDiffable<DataFrameTransfor
         }
         if (pivotConfig != null) {
             builder.field(PIVOT_TRANSFORM.getPreferredName(), pivotConfig);
+        }
+        if (params.paramAsBoolean(DataFrameField.INCLUDE_TYPE, false)) {
+            builder.field(DataFrameField.INDEX_DOC_TYPE.getPreferredName(), NAME);
         }
         if (headers.isEmpty() == false && params.paramAsBoolean(DataFrameField.FOR_INTERNAL_STORAGE, false) == true) {
             builder.field(HEADERS.getPreferredName(), headers);

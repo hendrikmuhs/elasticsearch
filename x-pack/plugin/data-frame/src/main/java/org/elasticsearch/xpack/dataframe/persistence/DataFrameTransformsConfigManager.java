@@ -34,11 +34,13 @@ import org.elasticsearch.index.IndexNotFoundException;
 import org.elasticsearch.index.engine.VersionConflictEngineException;
 import org.elasticsearch.xpack.core.dataframe.DataFrameField;
 import org.elasticsearch.xpack.core.dataframe.DataFrameMessages;
+import org.elasticsearch.xpack.dataframe.transforms.DataFrameTransformCheckpoints;
 import org.elasticsearch.xpack.dataframe.transforms.DataFrameTransformConfig;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 
 import static org.elasticsearch.xpack.core.ClientHelper.DATA_FRAME_ORIGIN;
@@ -48,7 +50,13 @@ public class DataFrameTransformsConfigManager {
 
     private static final Logger logger = LogManager.getLogger(DataFrameTransformsConfigManager.class);
 
-    public static final Map<String, String> TO_XCONTENT_PARAMS = Collections.singletonMap(DataFrameField.FOR_INTERNAL_STORAGE, "true");
+    public static final Map<String, String> TO_XCONTENT_PARAMS;
+    static {
+        Map<String, String> modifiable = new HashMap<>();
+        modifiable.put(DataFrameField.FOR_INTERNAL_STORAGE, "true");
+        modifiable.put(DataFrameField.INCLUDE_TYPE, "true");
+        TO_XCONTENT_PARAMS = Collections.unmodifiableMap(modifiable);
+    }
 
     private final Client client;
     private final NamedXContentRegistry xContentRegistry;
@@ -56,6 +64,24 @@ public class DataFrameTransformsConfigManager {
     public DataFrameTransformsConfigManager(Client client, NamedXContentRegistry xContentRegistry) {
         this.client = client;
         this.xContentRegistry = xContentRegistry;
+    }
+
+    public void putTransformCheckpoints(DataFrameTransformCheckpoints checkpoints, ActionListener<Boolean> listener) {
+        try (XContentBuilder builder = XContentFactory.jsonBuilder()) {
+            XContentBuilder source = checkpoints.toXContent(builder, new ToXContent.MapParams(TO_XCONTENT_PARAMS));
+
+            IndexRequest indexRequest = new IndexRequest(DataFrameInternalIndex.INDEX_NAME)
+                    .opType(DocWriteRequest.OpType.INDEX)
+                    .id(DataFrameTransformCheckpoints.documentId(checkpoints.getId()))
+                    .source(source);
+
+            executeAsyncWithOrigin(client, DATA_FRAME_ORIGIN, IndexAction.INSTANCE, indexRequest, ActionListener.wrap(r -> {
+                listener.onResponse(true);
+            }, listener::onFailure));
+        } catch (IOException e) {
+            // not expected to happen but for the sake of completeness
+            listener.onFailure(e);
+        }
     }
 
     public void putTransformConfiguration(DataFrameTransformConfig transformConfig, ActionListener<Boolean> listener) {
@@ -89,6 +115,19 @@ public class DataFrameTransformsConfigManager {
         }
     }
 
+    public void getTransformCheckpoints(String transformId, ActionListener<DataFrameTransformCheckpoints> resultListener) {
+        GetRequest getRequest = new GetRequest(DataFrameInternalIndex.INDEX_NAME, DataFrameTransformCheckpoints.documentId(transformId));
+        executeAsyncWithOrigin(client, DATA_FRAME_ORIGIN, GetAction.INSTANCE, getRequest, ActionListener.wrap(getResponse -> {
+
+            if (getResponse.isExists() == false) {
+                resultListener.onFailure(new ResourceNotFoundException("Unable to find checkpoint document for [" + transformId + "]"));
+                return;
+            }
+            BytesReference source = getResponse.getSourceAsBytesRef();
+            parseCheckpointsLenientlyFromSource(source, transformId, resultListener);
+        }, resultListener::onFailure));
+    }
+
     public void getTransformConfiguration(String transformId, ActionListener<DataFrameTransformConfig> resultListener) {
         GetRequest getRequest = new GetRequest(DataFrameInternalIndex.INDEX_NAME, DataFrameTransformConfig.documentId(transformId));
         executeAsyncWithOrigin(client, DATA_FRAME_ORIGIN, GetAction.INSTANCE, getRequest, ActionListener.wrap(getResponse -> {
@@ -111,6 +150,8 @@ public class DataFrameTransformsConfigManager {
     }
 
     public void deleteTransformConfiguration(String transformId, ActionListener<Boolean> listener) {
+
+        // todo: delete other related docs, too
         DeleteRequest request = new DeleteRequest(DataFrameInternalIndex.INDEX_NAME, DataFrameTransformConfig.documentId(transformId));
         request.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
 
@@ -140,6 +181,18 @@ public class DataFrameTransformsConfigManager {
             transformListener.onResponse(DataFrameTransformConfig.fromXContent(parser, transformId, true));
         } catch (Exception e) {
             logger.error(DataFrameMessages.getMessage(DataFrameMessages.FAILED_TO_PARSE_TRANSFORM_CONFIGURATION, transformId), e);
+            transformListener.onFailure(e);
+        }
+    }
+
+    private void parseCheckpointsLenientlyFromSource(BytesReference source, String transformId,
+            ActionListener<DataFrameTransformCheckpoints> transformListener) {
+        try (InputStream stream = source.streamInput();
+                XContentParser parser = XContentFactory.xContent(XContentType.JSON)
+                     .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, stream)) {
+            transformListener.onResponse(DataFrameTransformCheckpoints.fromXContent(parser, true));
+        } catch (Exception e) {
+            logger.error(DataFrameMessages.getMessage(DataFrameMessages.FAILED_TO_PARSE_TRANSFORM_CHECKPOINTS, transformId), e);
             transformListener.onFailure(e);
         }
     }

@@ -9,6 +9,8 @@ package org.elasticsearch.xpack.dataframe.persistence;
 import org.elasticsearch.ResourceAlreadyExistsException;
 import org.elasticsearch.ResourceNotFoundException;
 import org.elasticsearch.xpack.core.dataframe.DataFrameMessages;
+import org.elasticsearch.xpack.dataframe.transforms.DataFrameTransformCheckpoints;
+import org.elasticsearch.xpack.dataframe.transforms.DataFrameTransformCheckpointsTests;
 import org.elasticsearch.xpack.dataframe.transforms.DataFrameTransformConfig;
 import org.elasticsearch.xpack.dataframe.transforms.DataFrameTransformConfigTests;
 import org.junit.Before;
@@ -101,5 +103,17 @@ public class DataFrameTransformsConfigManagerTests extends DataFrameSingleNodeTe
                     assertEquals(DataFrameMessages.getMessage(DataFrameMessages.REST_DATA_FRAME_UNKNOWN_TRANSFORM, transformConfig.getId()),
                             e.getMessage());
                 });
+    }
+
+    public void testCreateReadDeleteCheckPoints() throws InterruptedException {
+        DataFrameTransformCheckpoints checkpoints = DataFrameTransformCheckpointsTests.randomDataFrameTransformCheckpoints();
+
+        // create
+        assertAsync(listener -> transformsConfigManager.putTransformCheckpoints(checkpoints, listener), true, null, null);
+
+        // read
+        assertAsync(listener -> transformsConfigManager.getTransformCheckpoints(checkpoints.getId(), listener), checkpoints, null, null);
+
+        // todo: delete
     }
 }
