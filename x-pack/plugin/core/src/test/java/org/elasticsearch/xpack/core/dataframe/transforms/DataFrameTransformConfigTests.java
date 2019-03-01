@@ -15,7 +15,7 @@ import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.common.xcontent.XContentType;
-import org.elasticsearch.xpack.dataframe.persistence.DataFrameTransformsConfigManager;
+import org.elasticsearch.xpack.core.dataframe.DataFrameField;
 import org.elasticsearch.xpack.core.dataframe.transforms.pivot.PivotConfigTests;
 import org.junit.Before;
 
@@ -27,7 +27,14 @@ import static org.elasticsearch.test.TestMatchers.matchesPattern;
 
 public class DataFrameTransformConfigTests extends AbstractSerializingDataFrameTestCase<DataFrameTransformConfig> {
 
-    private static Params TO_XCONTENT_PARAMS = new ToXContent.MapParams(DataFrameTransformsConfigManager.TO_XCONTENT_PARAMS);
+    private static final Params TO_XCONTENT_PARAMS;
+
+    static {
+        Map<String, String> mapParams = new HashMap<>();
+        mapParams.put(DataFrameField.FOR_INTERNAL_STORAGE, "true");
+        mapParams.put(DataFrameField.INCLUDE_TYPE, "true");
+        TO_XCONTENT_PARAMS = new ToXContent.MapParams(mapParams);
+    }
 
     private String transformId;
     private boolean runWithHeaders;
@@ -157,7 +164,7 @@ public class DataFrameTransformConfigTests extends AbstractSerializingDataFrameT
             XContentBuilder content = dataFrameTransformConfig.toXContent(xContentBuilder, getToXContentParams());
             String doc = Strings.toString(content);
 
-            assertThat(doc, matchesPattern(".*\"doc_type\"\\s*:\\s*\"data_frame_transforms_config\".*"));
+            assertThat(doc, matchesPattern(".*\"doc_type\"\\s*:\\s*\"data_frame_transform_config\".*"));
         }
 
         try (XContentBuilder xContentBuilder = XContentFactory.jsonBuilder()) {

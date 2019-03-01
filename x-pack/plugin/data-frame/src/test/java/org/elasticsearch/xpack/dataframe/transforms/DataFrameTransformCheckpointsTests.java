@@ -13,6 +13,7 @@ import org.elasticsearch.common.xcontent.ToXContent.Params;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.common.xcontent.XContentParser;
+import org.elasticsearch.xpack.core.dataframe.transforms.AbstractSerializingDataFrameTestCase;
 import org.elasticsearch.xpack.dataframe.persistence.DataFrameTransformsConfigManager;
 
 import java.io.IOException;
@@ -62,7 +63,7 @@ public class DataFrameTransformCheckpointsTests extends AbstractSerializingDataF
             XContentBuilder content = dataFrameTransformCheckpoints.toXContent(xContentBuilder, getToXContentParams());
             String doc = Strings.toString(content);
 
-            assertThat(doc, matchesPattern(".*\"doc_type\"\\s*:\\s*\"data_frame_transforms_checkpoints\".*"));
+            assertThat(doc, matchesPattern(".*\"doc_type\"\\s*:\\s*\"data_frame_transform_checkpoints\".*"));
         }
 
         try (XContentBuilder xContentBuilder = XContentFactory.jsonBuilder()) {

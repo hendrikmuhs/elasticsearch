@@ -30,7 +30,7 @@ public class DataFrameTransformCheckpoints extends AbstractDiffable<DataFrameTra
     public static final ParseField TIMESTAMP = new ParseField("timestamp");
     public static final ParseField CHECKPOINTS = new ParseField("checkpoints");
 
-    private static final String NAME = "data_frame_transforms_checkpoints";
+    private static final String NAME = "data_frame_transform_checkpoints";
 
     private static final ConstructingObjectParser<DataFrameTransformCheckpoints, Void> STRICT_PARSER = createParser(false);
     private static final ConstructingObjectParser<DataFrameTransformCheckpoints, Void> LENIENT_PARSER = createParser(true);
