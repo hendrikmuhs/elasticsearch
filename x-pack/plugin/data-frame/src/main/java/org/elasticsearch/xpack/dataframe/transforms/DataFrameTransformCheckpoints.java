@@ -144,6 +144,7 @@ public class DataFrameTransformCheckpoints extends AbstractDiffable<DataFrameTra
         final DataFrameTransformCheckpoints that = (DataFrameTransformCheckpoints) other;
 
         return Objects.equals(this.id, that.id)
+                && this.checkpoints.size() == that.checkpoints.size() // quick check
                 && this.checkpoints.entrySet().stream().allMatch(e -> Arrays.equals(e.getValue(), that.checkpoints.get(e.getKey())))
                 && this.timestamp == that.timestamp;
     }
