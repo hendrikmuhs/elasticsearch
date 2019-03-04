@@ -19,6 +19,8 @@ import org.elasticsearch.xpack.dataframe.persistence.DataFrameTransformsConfigMa
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 import static org.elasticsearch.test.TestMatchers.matchesPattern;
 
@@ -27,13 +29,16 @@ public class DataFrameTransformCheckpointsTests extends AbstractSerializingDataF
     private static Params TO_XCONTENT_PARAMS = new ToXContent.MapParams(DataFrameTransformsConfigManager.TO_XCONTENT_PARAMS);
 
     public static DataFrameTransformCheckpoints randomDataFrameTransformCheckpoints() {
-        List<Long> checkpoints = new ArrayList<>();
-        for (int i = 0; i < randomIntBetween(1, 20); ++i) {
-            checkpoints.add(randomNonNegativeLong());
-        }
 
-        return new DataFrameTransformCheckpoints(randomAlphaOfLengthBetween(1, 10), checkpoints.stream().mapToLong(l -> l).toArray(),
-                randomNonNegativeLong());
+        Map<String, long[]> checkpointsByIndex = new TreeMap<>();
+        for (int i = 0; i < randomIntBetween(1, 10); ++i) {
+            List<Long> checkpoints = new ArrayList<>();
+            for (int j = 0; j < randomIntBetween(1, 20); ++j) {
+                checkpoints.add(randomNonNegativeLong());
+            }
+            checkpointsByIndex.put(randomAlphaOfLengthBetween(1, 10), checkpoints.stream().mapToLong(l -> l).toArray());
+        }
+        return new DataFrameTransformCheckpoints(randomAlphaOfLengthBetween(1, 10), checkpointsByIndex, randomNonNegativeLong());
     }
 
     @Override
