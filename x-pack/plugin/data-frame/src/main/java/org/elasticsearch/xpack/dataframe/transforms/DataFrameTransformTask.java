@@ -34,6 +34,7 @@ import org.elasticsearch.xpack.core.dataframe.action.StartDataFrameTransformActi
 import org.elasticsearch.xpack.core.dataframe.action.StopDataFrameTransformAction;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameIndexerTransformStats;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransform;
+import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformCheckpoints;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformConfig;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformState;
 import org.elasticsearch.xpack.core.indexing.IndexerState;
@@ -340,14 +341,17 @@ public class DataFrameTransformTask extends AllocatedPersistentTask implements S
         @Override
         protected void createCheckpoints() {
             long timestamp = System.currentTimeMillis();
+
+            // for time based synchronization
+            long timestampCheckpoint = 0;
             CountDownLatch latch = new CountDownLatch(1);
 
             ClientHelper.executeWithHeadersAsync(transformConfig.getHeaders(), ClientHelper.DATA_FRAME_ORIGIN, client,
                     IndicesStatsAction.INSTANCE, new IndicesStatsRequest().indices(transformConfig.getSource()),
                     new LatchedActionListener<>(ActionListener.wrap(response -> {
                         extractIndexCheckPoints(response.getIndices(), ActionListener.wrap(checkpointsByIndex -> {
-                            DataFrameTransformCheckpoints checkpointDoc = new DataFrameTransformCheckpoints(getJobId(), checkpointsByIndex,
-                                    timestamp);
+                            DataFrameTransformCheckpoints checkpointDoc = new DataFrameTransformCheckpoints(getJobId(), timestamp,
+                                    checkpointsByIndex, timestampCheckpoint);
                             transformsConfigManager.putTransformCheckpoints(checkpointDoc, ActionListener.wrap(putCheckPointResponse -> {
                             }, createCheckpointException -> {
                                 throw new RuntimeException("Failed to create checkpoint document", createCheckpointException);
@@ -369,13 +373,13 @@ public class DataFrameTransformTask extends AllocatedPersistentTask implements S
 
         private void extractIndexCheckPoints(Map<String, IndexStats> indexStatsByIndex, ActionListener<Map<String, long[]>> listener) {
             Map<String, long[]> checkpointsByIndex = new TreeMap<>();
-            for (Entry<String, IndexStats> e : indexStatsByIndex.entrySet()) {
-                String indexName = e.getKey();
+            for (Entry<String, IndexStats> stats : indexStatsByIndex.entrySet()) {
+                String indexName = stats.getKey();
                 List<Long> checkpoints = new ArrayList<>();
-                for (IndexShardStats s : e.getValue()) {
-                    for (ShardStats ss : s.getShards()) {
+                for (IndexShardStats indexShardStats : stats.getValue()) {
+                    for (ShardStats shardStats : indexShardStats.getShards()) {
                         // we take the global checkpoint, which is consistent across all replicas
-                        checkpoints.add(ss.getSeqNoStats().getGlobalCheckpoint());
+                        checkpoints.add(shardStats.getSeqNoStats().getGlobalCheckpoint());
                     }
                 }
                 checkpointsByIndex.put(indexName, checkpoints.stream().mapToLong(l -> l).toArray());

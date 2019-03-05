@@ -4,7 +4,7 @@
  * you may not use this file except in compliance with the Elastic License.
  */
 
-package org.elasticsearch.xpack.dataframe.transforms;
+package org.elasticsearch.xpack.core.dataframe.transforms;
 
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.io.stream.Writeable.Reader;
@@ -13,11 +13,11 @@ import org.elasticsearch.common.xcontent.ToXContent.Params;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.common.xcontent.XContentParser;
-import org.elasticsearch.xpack.core.dataframe.transforms.AbstractSerializingDataFrameTestCase;
-import org.elasticsearch.xpack.dataframe.persistence.DataFrameTransformsConfigManager;
+import org.elasticsearch.xpack.core.dataframe.DataFrameField;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -26,7 +26,14 @@ import static org.elasticsearch.test.TestMatchers.matchesPattern;
 
 public class DataFrameTransformCheckpointsTests extends AbstractSerializingDataFrameTestCase<DataFrameTransformCheckpoints> {
 
-    private static Params TO_XCONTENT_PARAMS = new ToXContent.MapParams(DataFrameTransformsConfigManager.TO_XCONTENT_PARAMS);
+    private static final Params TO_XCONTENT_PARAMS;
+
+    static {
+        Map<String, String> mapParams = new HashMap<>();
+        mapParams.put(DataFrameField.FOR_INTERNAL_STORAGE, "true");
+        mapParams.put(DataFrameField.INCLUDE_TYPE, "true");
+        TO_XCONTENT_PARAMS = new ToXContent.MapParams(mapParams);
+    }
 
     public static DataFrameTransformCheckpoints randomDataFrameTransformCheckpoints() {
 
@@ -38,7 +45,8 @@ public class DataFrameTransformCheckpointsTests extends AbstractSerializingDataF
             }
             checkpointsByIndex.put(randomAlphaOfLengthBetween(1, 10), checkpoints.stream().mapToLong(l -> l).toArray());
         }
-        return new DataFrameTransformCheckpoints(randomAlphaOfLengthBetween(1, 10), checkpointsByIndex, randomNonNegativeLong());
+        return new DataFrameTransformCheckpoints(randomAlphaOfLengthBetween(1, 10), randomNonNegativeLong(), checkpointsByIndex,
+                randomNonNegativeLong());
     }
 
     @Override

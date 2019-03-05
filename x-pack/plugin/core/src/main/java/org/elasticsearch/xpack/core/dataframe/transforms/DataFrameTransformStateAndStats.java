@@ -22,32 +22,43 @@ public class DataFrameTransformStateAndStats implements Writeable, ToXContentObj
 
     private static final String NAME = "data_frame_transform_state_and_stats";
     public static final ParseField STATE_FIELD = new ParseField("state");
+    public static final ParseField NEXT_CHECKPOINTS_FIELD = new ParseField("next_checkpoints");
 
     private final String id;
     private final DataFrameTransformState transformState;
     private final DataFrameIndexerTransformStats transformStats;
+    private final DataFrameTransformCheckpoints nextCheckpoints;
 
     public static final ConstructingObjectParser<DataFrameTransformStateAndStats, Void> PARSER = new ConstructingObjectParser<>(
             NAME,
-            a -> new DataFrameTransformStateAndStats((String) a[0], (DataFrameTransformState) a[1], (DataFrameIndexerTransformStats) a[2]));
+            a -> new DataFrameTransformStateAndStats((String) a[0], (DataFrameTransformState) a[1], (DataFrameIndexerTransformStats) a[2]
+                    , (DataFrameTransformCheckpoints) a[3]));
 
     static {
         PARSER.declareString(ConstructingObjectParser.constructorArg(), DataFrameField.ID);
         PARSER.declareObject(ConstructingObjectParser.constructorArg(), DataFrameTransformState.PARSER::apply, STATE_FIELD);
         PARSER.declareObject(ConstructingObjectParser.constructorArg(), (p, c) -> DataFrameIndexerTransformStats.fromXContent(p),
                 DataFrameField.STATS_FIELD);
+        PARSER.declareObject(ConstructingObjectParser.optionalConstructorArg(), (p, c) -> DataFrameTransformCheckpoints.fromXContent(p, true),
+                NEXT_CHECKPOINTS_FIELD);
     }
 
-    public DataFrameTransformStateAndStats(String id, DataFrameTransformState state, DataFrameIndexerTransformStats stats) {
+    public DataFrameTransformStateAndStats(String id, DataFrameTransformState state, DataFrameIndexerTransformStats stats, DataFrameTransformCheckpoints nextCheckpoints) {
         this.id = Objects.requireNonNull(id);
         this.transformState = Objects.requireNonNull(state);
         this.transformStats = Objects.requireNonNull(stats);
+        this.nextCheckpoints = nextCheckpoints;
     }
 
     public DataFrameTransformStateAndStats(StreamInput in) throws IOException {
         this.id = in.readString();
         this.transformState = new DataFrameTransformState(in);
         this.transformStats = new DataFrameIndexerTransformStats(in);
+        if (in.readBoolean()) {
+            this.nextCheckpoints = new DataFrameTransformCheckpoints(in);
+        } else {
+            this.nextCheckpoints = null;
+        }
     }
 
     @Override
@@ -56,6 +67,9 @@ public class DataFrameTransformStateAndStats implements Writeable, ToXContentObj
         builder.field(DataFrameField.ID.getPreferredName(), id);
         builder.field(STATE_FIELD.getPreferredName(), transformState);
         builder.field(DataFrameField.STATS_FIELD.getPreferredName(), transformStats);
+        if (nextCheckpoints != null) {
+            builder.field(NEXT_CHECKPOINTS_FIELD.getPreferredName(), nextCheckpoints);
+        }
         builder.endObject();
         return builder;
     }
@@ -65,11 +79,17 @@ public class DataFrameTransformStateAndStats implements Writeable, ToXContentObj
         out.writeString(id);
         transformState.writeTo(out);
         transformStats.writeTo(out);
+        if (nextCheckpoints != null) {
+            out.writeBoolean(true);
+            nextCheckpoints.writeTo(out);
+        } else {
+            out.writeBoolean(false);
+        }
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, transformState, transformStats);
+        return Objects.hash(id, transformState, transformStats, nextCheckpoints);
     }
 
     @Override
@@ -85,7 +105,8 @@ public class DataFrameTransformStateAndStats implements Writeable, ToXContentObj
         DataFrameTransformStateAndStats that = (DataFrameTransformStateAndStats) other;
 
         return Objects.equals(this.id, that.id) && Objects.equals(this.transformState, that.transformState)
-                && Objects.equals(this.transformStats, that.transformStats);
+                && Objects.equals(this.transformStats, that.transformStats)
+                && Objects.equals(this.nextCheckpoints, that.nextCheckpoints);
     }
 
     public String getId() {
