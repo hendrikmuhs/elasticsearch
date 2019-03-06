@@ -36,7 +36,7 @@ import org.elasticsearch.index.IndexNotFoundException;
 import org.elasticsearch.index.engine.VersionConflictEngineException;
 import org.elasticsearch.xpack.core.dataframe.DataFrameField;
 import org.elasticsearch.xpack.core.dataframe.DataFrameMessages;
-import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformCheckpoints;
+import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformCheckpoint;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformConfig;
 
 import java.io.IOException;
@@ -71,13 +71,13 @@ public class DataFrameTransformsConfigManager {
         this.xContentRegistry = xContentRegistry;
     }
 
-    public void putTransformCheckpoints(DataFrameTransformCheckpoints checkpoints, ActionListener<Boolean> listener) {
+    public void putTransformCheckpoints(DataFrameTransformCheckpoint checkpoints, ActionListener<Boolean> listener) {
         try (XContentBuilder builder = XContentFactory.jsonBuilder()) {
             XContentBuilder source = checkpoints.toXContent(builder, new ToXContent.MapParams(TO_XCONTENT_PARAMS));
 
             IndexRequest indexRequest = new IndexRequest(DataFrameInternalIndex.INDEX_NAME)
                     .opType(DocWriteRequest.OpType.INDEX)
-                    .id(DataFrameTransformCheckpoints.documentId(checkpoints.getId()))
+                    .id(DataFrameTransformCheckpoint.documentId(checkpoints.getId()))
                     .source(source);
 
             executeAsyncWithOrigin(client, DATA_FRAME_ORIGIN, IndexAction.INSTANCE, indexRequest, ActionListener.wrap(r -> {
@@ -120,8 +120,8 @@ public class DataFrameTransformsConfigManager {
         }
     }
 
-    public void getTransformCheckpoints(String transformId, ActionListener<DataFrameTransformCheckpoints> resultListener) {
-        GetRequest getRequest = new GetRequest(DataFrameInternalIndex.INDEX_NAME, DataFrameTransformCheckpoints.documentId(transformId));
+    public void getTransformCheckpoints(String transformId, ActionListener<DataFrameTransformCheckpoint> resultListener) {
+        GetRequest getRequest = new GetRequest(DataFrameInternalIndex.INDEX_NAME, DataFrameTransformCheckpoint.documentId(transformId));
         executeAsyncWithOrigin(client, DATA_FRAME_ORIGIN, GetAction.INSTANCE, getRequest, ActionListener.wrap(getResponse -> {
 
             if (getResponse.isExists() == false) {
@@ -203,11 +203,11 @@ public class DataFrameTransformsConfigManager {
     }
 
     private void parseCheckpointsLenientlyFromSource(BytesReference source, String transformId,
-            ActionListener<DataFrameTransformCheckpoints> transformListener) {
+            ActionListener<DataFrameTransformCheckpoint> transformListener) {
         try (InputStream stream = source.streamInput();
                 XContentParser parser = XContentFactory.xContent(XContentType.JSON)
                      .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, stream)) {
-            transformListener.onResponse(DataFrameTransformCheckpoints.fromXContent(parser, true));
+            transformListener.onResponse(DataFrameTransformCheckpoint.fromXContent(parser, true));
         } catch (Exception e) {
             logger.error(DataFrameMessages.getMessage(DataFrameMessages.FAILED_TO_PARSE_TRANSFORM_CHECKPOINTS, transformId), e);
             transformListener.onFailure(e);

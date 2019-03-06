@@ -11,11 +11,6 @@ import org.apache.logging.log4j.Logger;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.LatchedActionListener;
-import org.elasticsearch.action.admin.indices.stats.IndexShardStats;
-import org.elasticsearch.action.admin.indices.stats.IndexStats;
-import org.elasticsearch.action.admin.indices.stats.IndicesStatsAction;
-import org.elasticsearch.action.admin.indices.stats.IndicesStatsRequest;
-import org.elasticsearch.action.admin.indices.stats.ShardStats;
 import org.elasticsearch.action.bulk.BulkAction;
 import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.bulk.BulkResponse;
@@ -34,19 +29,15 @@ import org.elasticsearch.xpack.core.dataframe.action.StartDataFrameTransformActi
 import org.elasticsearch.xpack.core.dataframe.action.StopDataFrameTransformAction;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameIndexerTransformStats;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransform;
-import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformCheckpoints;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformConfig;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformState;
 import org.elasticsearch.xpack.core.indexing.IndexerState;
 import org.elasticsearch.xpack.core.scheduler.SchedulerEngine;
 import org.elasticsearch.xpack.core.scheduler.SchedulerEngine.Event;
+import org.elasticsearch.xpack.dataframe.persistence.DataFrameTransformsCheckpointService;
 import org.elasticsearch.xpack.dataframe.persistence.DataFrameTransformsConfigManager;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -68,7 +59,8 @@ public class DataFrameTransformTask extends AllocatedPersistentTask implements S
 
     public DataFrameTransformTask(long id, String type, String action, TaskId parentTask, DataFrameTransform transform,
             DataFrameTransformState state, Client client, DataFrameTransformsConfigManager transformsConfigManager,
-            SchedulerEngine schedulerEngine, ThreadPool threadPool, Map<String, String> headers) {
+            DataFrameTransformsCheckpointService transformsCheckpointService, SchedulerEngine schedulerEngine, ThreadPool threadPool,
+            Map<String, String> headers) {
         super(id, type, action, DataFrameField.PERSISTENT_TASK_DESCRIPTION_PREFIX + transform.getId(), parentTask, headers);
         this.transform = transform;
         this.schedulerEngine = schedulerEngine;
@@ -93,8 +85,8 @@ public class DataFrameTransformTask extends AllocatedPersistentTask implements S
             initialGeneration = state.getGeneration();
         }
 
-        this.indexer = new ClientDataFrameIndexer(transform.getId(), transformsConfigManager, new AtomicReference<>(initialState),
-                initialPosition, client);
+        this.indexer = new ClientDataFrameIndexer(transform.getId(), transformsConfigManager, transformsCheckpointService,
+                new AtomicReference<>(initialState), initialPosition, client);
         this.generation = new AtomicReference<Long>(initialGeneration);
     }
 
@@ -237,15 +229,18 @@ public class DataFrameTransformTask extends AllocatedPersistentTask implements S
         private static final int CREATE_CHECKPOINT_TIMEOUT_IN_SECONDS = 30;
         private final Client client;
         private final DataFrameTransformsConfigManager transformsConfigManager;
+        private final DataFrameTransformsCheckpointService transformsCheckpointService;
         private final String transformId;
 
         private DataFrameTransformConfig transformConfig = null;
 
         public ClientDataFrameIndexer(String transformId, DataFrameTransformsConfigManager transformsConfigManager,
-                AtomicReference<IndexerState> initialState, Map<String, Object> initialPosition, Client client) {
+                DataFrameTransformsCheckpointService transformsCheckpointService, AtomicReference<IndexerState> initialState,
+                Map<String, Object> initialPosition, Client client) {
             super(threadPool.executor(ThreadPool.Names.GENERIC), initialState, initialPosition);
             this.transformId = transformId;
             this.transformsConfigManager = transformsConfigManager;
+            this.transformsCheckpointService = transformsCheckpointService;
             this.client = client;
         }
 
@@ -339,29 +334,17 @@ public class DataFrameTransformTask extends AllocatedPersistentTask implements S
         }
 
         @Override
-        protected void createCheckpoints() {
-            long timestamp = System.currentTimeMillis();
-
-            // for time based synchronization
-            long timestampCheckpoint = 0;
+        protected void createCheckpoint() {
             CountDownLatch latch = new CountDownLatch(1);
 
-            ClientHelper.executeWithHeadersAsync(transformConfig.getHeaders(), ClientHelper.DATA_FRAME_ORIGIN, client,
-                    IndicesStatsAction.INSTANCE, new IndicesStatsRequest().indices(transformConfig.getSource()),
-                    new LatchedActionListener<>(ActionListener.wrap(response -> {
-                        extractIndexCheckPoints(response.getIndices(), ActionListener.wrap(checkpointsByIndex -> {
-                            DataFrameTransformCheckpoints checkpointDoc = new DataFrameTransformCheckpoints(getJobId(), timestamp,
-                                    checkpointsByIndex, timestampCheckpoint);
-                            transformsConfigManager.putTransformCheckpoints(checkpointDoc, ActionListener.wrap(putCheckPointResponse -> {
-                            }, createCheckpointException -> {
-                                throw new RuntimeException("Failed to create checkpoint document", createCheckpointException);
-                            }));
-                        }, extractCheckpointsException -> {
-                            throw new RuntimeException("Failed to extract checkpoints", extractCheckpointsException);
-                        }));
-                    }, IndicesStatsRequestException -> {
-                        throw new RuntimeException("Failed to retrieve indices stats", IndicesStatsRequestException);
-                    }), latch));
+            transformsCheckpointService.getCheckpoint(transformConfig, new LatchedActionListener<>(ActionListener.wrap(checkpoint -> {
+                transformsConfigManager.putTransformCheckpoints(checkpoint, ActionListener.wrap(putCheckPointResponse -> {
+                }, createCheckpointException -> {
+                    throw new RuntimeException("Failed to create checkpoint", createCheckpointException);
+                }));
+            }, getCheckPointException -> {
+                throw new RuntimeException("Failed to retrieve checkpoint", getCheckPointException);
+            }), latch));
 
             // wait for async operations and return
             try {
@@ -369,22 +352,6 @@ public class DataFrameTransformTask extends AllocatedPersistentTask implements S
             } catch (InterruptedException e) {
                 throw new RuntimeException("Failed to create checkpoint for data frame transform [" + transformId + "]", e);
             }
-        }
-
-        private void extractIndexCheckPoints(Map<String, IndexStats> indexStatsByIndex, ActionListener<Map<String, long[]>> listener) {
-            Map<String, long[]> checkpointsByIndex = new TreeMap<>();
-            for (Entry<String, IndexStats> stats : indexStatsByIndex.entrySet()) {
-                String indexName = stats.getKey();
-                List<Long> checkpoints = new ArrayList<>();
-                for (IndexShardStats indexShardStats : stats.getValue()) {
-                    for (ShardStats shardStats : indexShardStats.getShards()) {
-                        // we take the global checkpoint, which is consistent across all replicas
-                        checkpoints.add(shardStats.getSeqNoStats().getGlobalCheckpoint());
-                    }
-                }
-                checkpointsByIndex.put(indexName, checkpoints.stream().mapToLong(l -> l).toArray());
-            }
-            listener.onResponse(checkpointsByIndex);
         }
     }
 }

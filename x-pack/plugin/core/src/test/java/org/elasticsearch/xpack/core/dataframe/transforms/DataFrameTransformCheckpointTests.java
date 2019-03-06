@@ -24,7 +24,7 @@ import java.util.TreeMap;
 
 import static org.elasticsearch.test.TestMatchers.matchesPattern;
 
-public class DataFrameTransformCheckpointsTests extends AbstractSerializingDataFrameTestCase<DataFrameTransformCheckpoints> {
+public class DataFrameTransformCheckpointTests extends AbstractSerializingDataFrameTestCase<DataFrameTransformCheckpoint> {
 
     private static final Params TO_XCONTENT_PARAMS;
 
@@ -35,7 +35,7 @@ public class DataFrameTransformCheckpointsTests extends AbstractSerializingDataF
         TO_XCONTENT_PARAMS = new ToXContent.MapParams(mapParams);
     }
 
-    public static DataFrameTransformCheckpoints randomDataFrameTransformCheckpoints() {
+    public static DataFrameTransformCheckpoint randomDataFrameTransformCheckpoints() {
 
         Map<String, long[]> checkpointsByIndex = new TreeMap<>();
         for (int i = 0; i < randomIntBetween(1, 10); ++i) {
@@ -45,23 +45,23 @@ public class DataFrameTransformCheckpointsTests extends AbstractSerializingDataF
             }
             checkpointsByIndex.put(randomAlphaOfLengthBetween(1, 10), checkpoints.stream().mapToLong(l -> l).toArray());
         }
-        return new DataFrameTransformCheckpoints(randomAlphaOfLengthBetween(1, 10), randomNonNegativeLong(), checkpointsByIndex,
+        return new DataFrameTransformCheckpoint(randomAlphaOfLengthBetween(1, 10), randomNonNegativeLong(), checkpointsByIndex,
                 randomNonNegativeLong());
     }
 
     @Override
-    protected DataFrameTransformCheckpoints doParseInstance(XContentParser parser) throws IOException {
-        return DataFrameTransformCheckpoints.fromXContent(parser, false);
+    protected DataFrameTransformCheckpoint doParseInstance(XContentParser parser) throws IOException {
+        return DataFrameTransformCheckpoint.fromXContent(parser, false);
     }
 
     @Override
-    protected DataFrameTransformCheckpoints createTestInstance() {
+    protected DataFrameTransformCheckpoint createTestInstance() {
         return randomDataFrameTransformCheckpoints();
     }
 
     @Override
-    protected Reader<DataFrameTransformCheckpoints> instanceReader() {
-        return DataFrameTransformCheckpoints::new;
+    protected Reader<DataFrameTransformCheckpoint> instanceReader() {
+        return DataFrameTransformCheckpoint::new;
     }
 
     @Override
@@ -70,7 +70,7 @@ public class DataFrameTransformCheckpointsTests extends AbstractSerializingDataF
     }
 
     public void testXContentForInternalStorage() throws IOException {
-        DataFrameTransformCheckpoints dataFrameTransformCheckpoints = randomDataFrameTransformCheckpoints();
+        DataFrameTransformCheckpoint dataFrameTransformCheckpoints = randomDataFrameTransformCheckpoints();
 
         try (XContentBuilder xContentBuilder = XContentFactory.jsonBuilder()) {
             XContentBuilder content = dataFrameTransformCheckpoints.toXContent(xContentBuilder, getToXContentParams());

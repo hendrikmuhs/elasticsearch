@@ -29,28 +29,28 @@ import java.util.TreeMap;
 import static org.elasticsearch.common.xcontent.ConstructingObjectParser.constructorArg;
 import static org.elasticsearch.common.xcontent.ConstructingObjectParser.optionalConstructorArg;
 
-public class DataFrameTransformCheckpoints extends AbstractDiffable<DataFrameTransformCheckpoints> implements Writeable, ToXContentObject {
+public class DataFrameTransformCheckpoint extends AbstractDiffable<DataFrameTransformCheckpoint> implements Writeable, ToXContentObject {
 
     // the timestamp of the checkpoint, mandatory
     public static final ParseField TIMESTAMP = new ParseField("timestamp");
 
     // checkpoint of the indexes (sequence id's)
-    public static final ParseField CHECKPOINTS = new ParseField("checkpoints");
+    public static final ParseField INDEX_LEVEL_CHECKPOINTS = new ParseField("index_level_checkpoints");
     // checkpoint for for time based sync
-    public static final ParseField TIMESTAMP_CHECKPOINT = new ParseField("timestamp_checkpoint");
+    public static final ParseField TIME_BASED_CHECKPOINT = new ParseField("time_based_checkpoint");
 
-    private static final String NAME = "data_frame_transform_checkpoints";
+    private static final String NAME = "data_frame_transform_checkpoint";
 
-    private static final ConstructingObjectParser<DataFrameTransformCheckpoints, Void> STRICT_PARSER = createParser(false);
-    private static final ConstructingObjectParser<DataFrameTransformCheckpoints, Void> LENIENT_PARSER = createParser(true);
+    private static final ConstructingObjectParser<DataFrameTransformCheckpoint, Void> STRICT_PARSER = createParser(false);
+    private static final ConstructingObjectParser<DataFrameTransformCheckpoint, Void> LENIENT_PARSER = createParser(true);
 
     private final String id;
     private final Map<String, long[]> checkpoints;
     private final long timestamp;
     private final long timestampCheckpoint;
 
-    private static ConstructingObjectParser<DataFrameTransformCheckpoints, Void> createParser(boolean lenient) {
-        ConstructingObjectParser<DataFrameTransformCheckpoints, Void> parser = new ConstructingObjectParser<>(NAME,
+    private static ConstructingObjectParser<DataFrameTransformCheckpoint, Void> createParser(boolean lenient) {
+        ConstructingObjectParser<DataFrameTransformCheckpoint, Void> parser = new ConstructingObjectParser<>(NAME,
                 lenient, args -> {
                     String id = (String) args[0];
                     Long timestamp = (Long) args[1];
@@ -61,7 +61,7 @@ public class DataFrameTransformCheckpoints extends AbstractDiffable<DataFrameTra
                     Long timestamp_checkpoint = (Long) args[3];
 
                     // ignored, only for internal storage: String docType = (String) args[4];
-                    return new DataFrameTransformCheckpoints(id, timestamp, checkpoints, timestamp_checkpoint);
+                    return new DataFrameTransformCheckpoint(id, timestamp, checkpoints, timestamp_checkpoint);
                 });
 
         parser.declareString(constructorArg(), DataFrameField.ID);
@@ -86,21 +86,21 @@ public class DataFrameTransformCheckpoints extends AbstractDiffable<DataFrameTra
                 checkPointsByIndexName.put(indexName, checkpoints);
             }
             return checkPointsByIndexName;
-        }, CHECKPOINTS);
-        parser.declareLong(optionalConstructorArg(), TIMESTAMP_CHECKPOINT);
+        }, INDEX_LEVEL_CHECKPOINTS);
+        parser.declareLong(optionalConstructorArg(), TIME_BASED_CHECKPOINT);
         parser.declareString(optionalConstructorArg(), DataFrameField.INDEX_DOC_TYPE);
 
         return parser;
     }
 
-    public DataFrameTransformCheckpoints(String id, Long timestamp, Map<String, long[]> checkpoints, Long timestamp_checkpoint) {
+    public DataFrameTransformCheckpoint(String id, Long timestamp, Map<String, long[]> checkpoints, Long timestamp_checkpoint) {
         this.id = id;
         this.timestamp = timestamp.longValue();
         this.checkpoints = checkpoints;
         this.timestampCheckpoint = timestamp_checkpoint == null ? 0 : timestamp_checkpoint.longValue();
     }
 
-    public DataFrameTransformCheckpoints(StreamInput in) throws IOException {
+    public DataFrameTransformCheckpoint(StreamInput in) throws IOException {
         this.id = in.readString();
         this.timestamp = in.readLong();
         this.checkpoints = readCheckpoints(in.readMap());
@@ -113,13 +113,13 @@ public class DataFrameTransformCheckpoints extends AbstractDiffable<DataFrameTra
         builder.field(DataFrameField.ID.getPreferredName(), id);
         builder.field(TIMESTAMP.getPreferredName(), timestamp);
 
-        builder.startObject(CHECKPOINTS.getPreferredName());
+        builder.startObject(INDEX_LEVEL_CHECKPOINTS.getPreferredName());
         for (Entry<String, long[]> entry : checkpoints.entrySet()) {
             builder.array(entry.getKey(), entry.getValue());
         }
         builder.endObject();
         if (timestampCheckpoint > 0) {
-            builder.field(TIMESTAMP_CHECKPOINT.getPreferredName(), timestampCheckpoint);
+            builder.field(TIME_BASED_CHECKPOINT.getPreferredName(), timestampCheckpoint);
         }
 
         if (params.paramAsBoolean(DataFrameField.INCLUDE_TYPE, false)) {
@@ -151,10 +151,17 @@ public class DataFrameTransformCheckpoints extends AbstractDiffable<DataFrameTra
             return false;
         }
 
-        final DataFrameTransformCheckpoints that = (DataFrameTransformCheckpoints) other;
+        final DataFrameTransformCheckpoint that = (DataFrameTransformCheckpoint) other;
+
+        return this.timestamp == that.timestamp && matches(that);
+    }
+
+    public boolean matches (DataFrameTransformCheckpoint that) {
+        if (this == that) {
+            return true;
+        }
 
         return Objects.equals(this.id, that.id)
-                && this.timestamp == that.timestamp
                 && this.checkpoints.size() == that.checkpoints.size() // quick check
                 && this.timestampCheckpoint == that.timestampCheckpoint
                 // do the expensive deep equal operation last
@@ -171,7 +178,7 @@ public class DataFrameTransformCheckpoints extends AbstractDiffable<DataFrameTra
         return hash;
     }
 
-    public static DataFrameTransformCheckpoints fromXContent(final XContentParser parser, boolean lenient) throws IOException {
+    public static DataFrameTransformCheckpoint fromXContent(final XContentParser parser, boolean lenient) throws IOException {
         return lenient ? LENIENT_PARSER.apply(parser, null) : STRICT_PARSER.apply(parser, null);
     }
 

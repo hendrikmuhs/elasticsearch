@@ -26,9 +26,10 @@ import org.elasticsearch.transport.TransportService;
 import org.elasticsearch.xpack.core.dataframe.action.GetDataFrameTransformsStatsAction;
 import org.elasticsearch.xpack.core.dataframe.action.GetDataFrameTransformsStatsAction.Request;
 import org.elasticsearch.xpack.core.dataframe.action.GetDataFrameTransformsStatsAction.Response;
-import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformCheckpoints;
+import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformCheckpoint;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformStateAndStats;
 import org.elasticsearch.xpack.dataframe.persistence.DataFramePersistentTaskUtils;
+import org.elasticsearch.xpack.dataframe.persistence.DataFrameTransformsCheckpointService;
 import org.elasticsearch.xpack.dataframe.persistence.DataFrameTransformsConfigManager;
 import org.elasticsearch.xpack.dataframe.transforms.DataFrameTransformTask;
 
@@ -46,13 +47,16 @@ public class TransportGetDataFrameTransformsStatsAction extends
         GetDataFrameTransformsStatsAction.Response> {
 
     private final DataFrameTransformsConfigManager transformsConfigManager;
+    private final DataFrameTransformsCheckpointService transformsCheckpointService;
 
     @Inject
     public TransportGetDataFrameTransformsStatsAction(TransportService transportService, ActionFilters actionFilters,
-            ClusterService clusterService, DataFrameTransformsConfigManager transformsConfigManager) {
+            ClusterService clusterService, DataFrameTransformsConfigManager transformsConfigManager,
+            DataFrameTransformsCheckpointService transformsCheckpointService) {
         super(GetDataFrameTransformsStatsAction.NAME, clusterService, transportService, actionFilters, Request::new, Response::new,
                 Response::new, ThreadPool.Names.SAME);
         this.transformsConfigManager = transformsConfigManager;
+        this.transformsCheckpointService = transformsCheckpointService;
     }
 
     @Override
@@ -71,16 +75,27 @@ public class TransportGetDataFrameTransformsStatsAction extends
 
         // Little extra insurance, make sure we only return transforms that aren't cancelled
         if (task.isCancelled() == false) {
-            CountDownLatch latch = new CountDownLatch(1);
+            CountDownLatch latch = new CountDownLatch(2);
 
-            // the checkpoints we are currently approaching
-            SetOnce<DataFrameTransformCheckpoints> nextCheckpoints = new SetOnce<>();
+            // the checkpoints in progress
+            SetOnce<DataFrameTransformCheckpoint> inProgressCheckpoint = new SetOnce<>();
+            SetOnce<DataFrameTransformCheckpoint> currentCheckpoint = new SetOnce<>();
 
             transformsConfigManager.getTransformCheckpoints(task.getTransformId(),
                     new LatchedActionListener<>(ActionListener.wrap(checkpoints -> {
-                        nextCheckpoints.set(checkpoints);
+                        inProgressCheckpoint.set(checkpoints);
                     }, e -> {
                         // todo: log
+                    }), latch));
+
+            transformsConfigManager.getTransformConfiguration(task.getTransformId(),
+                    new LatchedActionListener<>(ActionListener.wrap(transformConfig -> {
+                        transformsCheckpointService.getCheckpoint(transformConfig, ActionListener.wrap(checkpoint -> {
+                            currentCheckpoint.set(checkpoint);
+                        }, e2 -> {
+                        }));
+
+                    }, e -> {
                     }), latch));
 
             try {
@@ -89,8 +104,14 @@ public class TransportGetDataFrameTransformsStatsAction extends
                 throw new RuntimeException(e1);
             }
 
+            boolean checkpointsMatch = false;
+
+            if (currentCheckpoint.get() != null && inProgressCheckpoint.get() != null) {
+                checkpointsMatch = currentCheckpoint.get().matches(inProgressCheckpoint.get());
+            }
+
             DataFrameTransformStateAndStats transformStateAndStats = new DataFrameTransformStateAndStats(task.getTransformId(),
-                    task.getState(), task.getStats(), nextCheckpoints.get());
+                    task.getState(), task.getStats(), checkpointsMatch, inProgressCheckpoint.get());
             listener.onResponse(new Response(Collections.singletonList(transformStateAndStats)));
         } else {
             listener.onResponse(new Response(Collections.emptyList()));

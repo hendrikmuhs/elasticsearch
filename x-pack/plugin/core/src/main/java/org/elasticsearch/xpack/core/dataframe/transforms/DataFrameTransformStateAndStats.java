@@ -22,42 +22,47 @@ public class DataFrameTransformStateAndStats implements Writeable, ToXContentObj
 
     private static final String NAME = "data_frame_transform_state_and_stats";
     public static final ParseField STATE_FIELD = new ParseField("state");
-    public static final ParseField NEXT_CHECKPOINTS_FIELD = new ParseField("next_checkpoints");
+    public static final ParseField IN_PROGRESS_CHECKPOINT_FIELD = new ParseField("in_progress_checkpoint");
+    public static final ParseField IN_SYNC_FIELD = new ParseField("in_sync");
 
     private final String id;
     private final DataFrameTransformState transformState;
     private final DataFrameIndexerTransformStats transformStats;
-    private final DataFrameTransformCheckpoints nextCheckpoints;
+    private final DataFrameTransformCheckpoint inProgressCheckpoint;
+    private final boolean inSync;
 
-    public static final ConstructingObjectParser<DataFrameTransformStateAndStats, Void> PARSER = new ConstructingObjectParser<>(
-            NAME,
-            a -> new DataFrameTransformStateAndStats((String) a[0], (DataFrameTransformState) a[1], (DataFrameIndexerTransformStats) a[2]
-                    , (DataFrameTransformCheckpoints) a[3]));
+    public static final ConstructingObjectParser<DataFrameTransformStateAndStats, Void> PARSER = new ConstructingObjectParser<>(NAME,
+            a -> new DataFrameTransformStateAndStats((String) a[0], (DataFrameTransformState) a[1], (DataFrameIndexerTransformStats) a[2],
+                    (boolean) a[3], (DataFrameTransformCheckpoint) a[4]));
 
     static {
         PARSER.declareString(ConstructingObjectParser.constructorArg(), DataFrameField.ID);
         PARSER.declareObject(ConstructingObjectParser.constructorArg(), DataFrameTransformState.PARSER::apply, STATE_FIELD);
         PARSER.declareObject(ConstructingObjectParser.constructorArg(), (p, c) -> DataFrameIndexerTransformStats.fromXContent(p),
                 DataFrameField.STATS_FIELD);
-        PARSER.declareObject(ConstructingObjectParser.optionalConstructorArg(), (p, c) -> DataFrameTransformCheckpoints.fromXContent(p, true),
-                NEXT_CHECKPOINTS_FIELD);
+        PARSER.declareBoolean(ConstructingObjectParser.constructorArg(), IN_SYNC_FIELD);
+        PARSER.declareObject(ConstructingObjectParser.optionalConstructorArg(), (p, c) -> DataFrameTransformCheckpoint.fromXContent(p, true),
+                IN_PROGRESS_CHECKPOINT_FIELD);
     }
 
-    public DataFrameTransformStateAndStats(String id, DataFrameTransformState state, DataFrameIndexerTransformStats stats, DataFrameTransformCheckpoints nextCheckpoints) {
+    public DataFrameTransformStateAndStats(String id, DataFrameTransformState state, DataFrameIndexerTransformStats stats,
+            boolean inSync, DataFrameTransformCheckpoint inProgressCheckpoint) {
         this.id = Objects.requireNonNull(id);
         this.transformState = Objects.requireNonNull(state);
         this.transformStats = Objects.requireNonNull(stats);
-        this.nextCheckpoints = nextCheckpoints;
+        this.inSync = inSync;
+        this.inProgressCheckpoint = inProgressCheckpoint;
     }
 
     public DataFrameTransformStateAndStats(StreamInput in) throws IOException {
         this.id = in.readString();
         this.transformState = new DataFrameTransformState(in);
         this.transformStats = new DataFrameIndexerTransformStats(in);
+        this.inSync = in.readBoolean();
         if (in.readBoolean()) {
-            this.nextCheckpoints = new DataFrameTransformCheckpoints(in);
+            this.inProgressCheckpoint = new DataFrameTransformCheckpoint(in);
         } else {
-            this.nextCheckpoints = null;
+            this.inProgressCheckpoint = null;
         }
     }
 
@@ -67,8 +72,9 @@ public class DataFrameTransformStateAndStats implements Writeable, ToXContentObj
         builder.field(DataFrameField.ID.getPreferredName(), id);
         builder.field(STATE_FIELD.getPreferredName(), transformState);
         builder.field(DataFrameField.STATS_FIELD.getPreferredName(), transformStats);
-        if (nextCheckpoints != null) {
-            builder.field(NEXT_CHECKPOINTS_FIELD.getPreferredName(), nextCheckpoints);
+        builder.field(IN_SYNC_FIELD.getPreferredName(), inSync);
+        if (inProgressCheckpoint != null) {
+            builder.field(IN_PROGRESS_CHECKPOINT_FIELD.getPreferredName(), inProgressCheckpoint);
         }
         builder.endObject();
         return builder;
@@ -79,9 +85,10 @@ public class DataFrameTransformStateAndStats implements Writeable, ToXContentObj
         out.writeString(id);
         transformState.writeTo(out);
         transformStats.writeTo(out);
-        if (nextCheckpoints != null) {
+        out.writeBoolean(inSync);
+        if (inProgressCheckpoint != null) {
             out.writeBoolean(true);
-            nextCheckpoints.writeTo(out);
+            inProgressCheckpoint.writeTo(out);
         } else {
             out.writeBoolean(false);
         }
@@ -89,7 +96,7 @@ public class DataFrameTransformStateAndStats implements Writeable, ToXContentObj
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, transformState, transformStats, nextCheckpoints);
+        return Objects.hash(id, transformState, transformStats, inSync, inProgressCheckpoint);
     }
 
     @Override
@@ -106,7 +113,8 @@ public class DataFrameTransformStateAndStats implements Writeable, ToXContentObj
 
         return Objects.equals(this.id, that.id) && Objects.equals(this.transformState, that.transformState)
                 && Objects.equals(this.transformStats, that.transformStats)
-                && Objects.equals(this.nextCheckpoints, that.nextCheckpoints);
+                && this.inSync == that.inSync
+                && Objects.equals(this.inProgressCheckpoint, that.inProgressCheckpoint);
     }
 
     public String getId() {

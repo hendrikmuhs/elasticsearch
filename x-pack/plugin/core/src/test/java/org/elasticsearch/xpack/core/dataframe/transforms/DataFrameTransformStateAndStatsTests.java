@@ -17,7 +17,8 @@ public class DataFrameTransformStateAndStatsTests extends AbstractSerializingDat
         return new DataFrameTransformStateAndStats(randomAlphaOfLengthBetween(1, 10),
                 DataFrameTransformStateTests.randomDataFrameTransformState(),
                 DataFrameIndexerTransformStatsTests.randomStats(),
-                DataFrameTransformCheckpointsTests.randomDataFrameTransformCheckpoints()
+                randomBoolean(),
+                DataFrameTransformCheckpointTests.randomDataFrameTransformCheckpoints()
                 );
     }
 
