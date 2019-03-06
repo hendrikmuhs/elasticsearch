@@ -76,7 +76,7 @@ public class DataFrameTransformCheckpointTests extends AbstractSerializingDataFr
             XContentBuilder content = dataFrameTransformCheckpoints.toXContent(xContentBuilder, getToXContentParams());
             String doc = Strings.toString(content);
 
-            assertThat(doc, matchesPattern(".*\"doc_type\"\\s*:\\s*\"data_frame_transform_checkpoints\".*"));
+            assertThat(doc, matchesPattern(".*\"doc_type\"\\s*:\\s*\"data_frame_transform_checkpoint\".*"));
         }
 
         try (XContentBuilder xContentBuilder = XContentFactory.jsonBuilder()) {

@@ -14,7 +14,6 @@ import org.elasticsearch.ResourceNotFoundException;
 import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.DocWriteRequest;
 import org.elasticsearch.action.DocWriteResponse;
-import org.elasticsearch.action.LatchedActionListener;
 import org.elasticsearch.action.delete.DeleteAction;
 import org.elasticsearch.action.delete.DeleteRequest;
 import org.elasticsearch.action.get.GetAction;
@@ -23,7 +22,6 @@ import org.elasticsearch.action.index.IndexAction;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.support.WriteRequest;
 import org.elasticsearch.client.Client;
-import org.elasticsearch.common.CheckedConsumer;
 import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.xcontent.LoggingDeprecationHandler;
 import org.elasticsearch.common.xcontent.NamedXContentRegistry;
@@ -44,9 +42,6 @@ import java.io.InputStream;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 
 import static org.elasticsearch.xpack.core.ClientHelper.DATA_FRAME_ORIGIN;
 import static org.elasticsearch.xpack.core.ClientHelper.executeAsyncWithOrigin;
@@ -177,17 +172,6 @@ public class DataFrameTransformsConfigManager {
                 listener.onFailure(e);
             }
         }));
-    }
-
-    static <T> void getAsync(Consumer<ActionListener<T>> function, CheckedConsumer<T, ? extends Exception> onAnswer,
-            Consumer<Exception> onException) throws InterruptedException {
-
-        CountDownLatch latch = new CountDownLatch(1);
-
-        LatchedActionListener<T> listener = new LatchedActionListener<>(ActionListener.wrap(onAnswer::accept, onException::accept), latch);
-
-        function.accept(listener);
-        latch.await(10, TimeUnit.SECONDS);
     }
 
     private void parseTransformLenientlyFromSource(BytesReference source, String transformId,

@@ -81,7 +81,6 @@ public class DataFrameTransformCheckpoint extends AbstractDiffable<DataFrameTran
                     throw new ParsingException(p.getTokenLocation(), "Unexpected token " + token + " ");
                 }
 
-                // TODO: type checks
                 long[] checkpoints = p.listOrderedMap().stream().mapToLong(num -> ((Number) num).longValue()).toArray();
                 checkPointsByIndexName.put(indexName, checkpoints);
             }
