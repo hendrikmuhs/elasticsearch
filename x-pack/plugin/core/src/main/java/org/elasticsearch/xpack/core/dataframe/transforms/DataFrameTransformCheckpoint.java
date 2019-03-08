@@ -208,7 +208,8 @@ public class DataFrameTransformCheckpoint extends AbstractDiffable<DataFrameTran
                 && this.indicesCheckpoints.size() == that.indicesCheckpoints.size() // quick check
                 && this.timeUpperBoundMillis == that.timeUpperBoundMillis
                 // do the expensive deep equal operation last
-                && this.indicesCheckpoints.entrySet().stream().allMatch(e -> Arrays.equals(e.getValue(), that.indicesCheckpoints.get(e.getKey())));
+                && this.indicesCheckpoints.entrySet().stream()
+                        .allMatch(e -> Arrays.equals(e.getValue(), that.indicesCheckpoints.get(e.getKey())));
     }
 
     @Override
