@@ -9,6 +9,8 @@ package org.elasticsearch.xpack.dataframe.persistence;
 import org.elasticsearch.ResourceAlreadyExistsException;
 import org.elasticsearch.ResourceNotFoundException;
 import org.elasticsearch.xpack.core.dataframe.DataFrameMessages;
+import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformCheckpoint;
+import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformCheckpointTests;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformConfig;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformConfigTests;
 import org.junit.Before;
@@ -48,7 +50,7 @@ public class DataFrameTransformsConfigManagerTests extends DataFrameSingleNodeTe
 
     public void testDeleteMissingTransform() throws InterruptedException {
         // the index does not exist yet
-        assertAsync(listener -> transformsConfigManager.deleteTransformConfiguration("not_there", listener), (Boolean) null, null, e -> {
+        assertAsync(listener -> transformsConfigManager.deleteTransformMetaData("not_there", listener), (Boolean) null, null, e -> {
             assertEquals(ResourceNotFoundException.class, e.getClass());
             assertEquals(DataFrameMessages.getMessage(DataFrameMessages.REST_DATA_FRAME_UNKNOWN_TRANSFORM, "not_there"), e.getMessage());
         });
@@ -60,7 +62,7 @@ public class DataFrameTransformsConfigManagerTests extends DataFrameSingleNodeTe
                 true, null, null);
 
         // same test, but different code path
-        assertAsync(listener -> transformsConfigManager.deleteTransformConfiguration("not_there", listener), (Boolean) null, null, e -> {
+        assertAsync(listener -> transformsConfigManager.deleteTransformMetaData("not_there", listener), (Boolean) null, null, e -> {
             assertEquals(ResourceNotFoundException.class, e.getClass());
             assertEquals(DataFrameMessages.getMessage(DataFrameMessages.REST_DATA_FRAME_UNKNOWN_TRANSFORM, "not_there"), e.getMessage());
         });
@@ -84,10 +86,10 @@ public class DataFrameTransformsConfigManagerTests extends DataFrameSingleNodeTe
         });
 
         // delete transform
-        assertAsync(listener -> transformsConfigManager.deleteTransformConfiguration(transformConfig.getId(), listener), true, null, null);
+        assertAsync(listener -> transformsConfigManager.deleteTransformMetaData(transformConfig.getId(), listener), true, null, null);
 
         // delete again
-        assertAsync(listener -> transformsConfigManager.deleteTransformConfiguration(transformConfig.getId(), listener), (Boolean) null,
+        assertAsync(listener -> transformsConfigManager.deleteTransformMetaData(transformConfig.getId(), listener), (Boolean) null,
                 null, e -> {
                     assertEquals(ResourceNotFoundException.class, e.getClass());
                     assertEquals(DataFrameMessages.getMessage(DataFrameMessages.REST_DATA_FRAME_UNKNOWN_TRANSFORM, transformConfig.getId()),
@@ -101,5 +103,17 @@ public class DataFrameTransformsConfigManagerTests extends DataFrameSingleNodeTe
                     assertEquals(DataFrameMessages.getMessage(DataFrameMessages.REST_DATA_FRAME_UNKNOWN_TRANSFORM, transformConfig.getId()),
                             e.getMessage());
                 });
+    }
+
+    public void testCreateReadDeleteCheckPoints() throws InterruptedException {
+        DataFrameTransformCheckpoint checkpoints = DataFrameTransformCheckpointTests.randomDataFrameTransformCheckpoints();
+
+        // create
+        assertAsync(listener -> transformsConfigManager.putTransformCheckpoints(checkpoints, listener), true, null, null);
+
+        // read
+        assertAsync(listener -> transformsConfigManager.getTransformCheckpoints(checkpoints.getId(), listener), checkpoints, null, null);
+
+        // todo: delete
     }
 }
