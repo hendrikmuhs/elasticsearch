@@ -29,7 +29,6 @@ import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.index.IndexNotFoundException;
 import org.elasticsearch.index.engine.VersionConflictEngineException;
-import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.reindex.DeleteByQueryAction;
@@ -153,10 +152,7 @@ public class DataFrameTransformsConfigManager {
                 .setSlices(5);
 
         request.indices(DataFrameInternalIndex.INDEX_NAME);
-        BoolQueryBuilder innerBoolQuery = QueryBuilders.boolQuery();
-        innerBoolQuery.must(QueryBuilders.termsQuery(DataFrameField.ID.getPreferredName(), transformId));
-
-        QueryBuilder query = QueryBuilders.boolQuery().filter(innerBoolQuery);
+        QueryBuilder query = QueryBuilders.termsQuery(DataFrameField.ID.getPreferredName(), transformId);
         request.setQuery(query);
         request.setRefresh(true);
 
