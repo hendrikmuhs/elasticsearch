@@ -77,6 +77,7 @@ public class DataFrameTransformCheckpoint extends AbstractDiffable<DataFrameTran
 
         // note: this is never parsed from the outside where timestamp can be formatted as date time
         parser.declareLong(constructorArg(), TIMESTAMP);
+        parser.declareLong(constructorArg(), CHECKPOINT);
 
         parser.declareObject(constructorArg(), (p,c) -> {
             Map<String, long[]> checkPointsByIndexName = new TreeMap<>();
@@ -196,7 +197,8 @@ public class DataFrameTransformCheckpoint extends AbstractDiffable<DataFrameTran
 
         final DataFrameTransformCheckpoint that = (DataFrameTransformCheckpoint) other;
 
-        return this.timestampMillis == that.timestampMillis && this.checkpoint == that.checkpoint && matches(that);
+        return this.timestampMillis == that.timestampMillis && this.checkpoint == that.checkpoint
+                && this.timeUpperBoundMillis == that.timeUpperBoundMillis && matches(that);
     }
 
     public boolean matches (DataFrameTransformCheckpoint that) {
@@ -206,7 +208,6 @@ public class DataFrameTransformCheckpoint extends AbstractDiffable<DataFrameTran
 
         return Objects.equals(this.id, that.id)
                 && this.indicesCheckpoints.size() == that.indicesCheckpoints.size() // quick check
-                && this.timeUpperBoundMillis == that.timeUpperBoundMillis
                 // do the expensive deep equal operation last
                 && this.indicesCheckpoints.entrySet().stream()
                         .allMatch(e -> Arrays.equals(e.getValue(), that.indicesCheckpoints.get(e.getKey())));

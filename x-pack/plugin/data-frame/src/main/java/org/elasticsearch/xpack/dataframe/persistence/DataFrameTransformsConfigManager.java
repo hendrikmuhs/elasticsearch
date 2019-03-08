@@ -13,8 +13,6 @@ import org.elasticsearch.ResourceAlreadyExistsException;
 import org.elasticsearch.ResourceNotFoundException;
 import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.DocWriteRequest;
-import org.elasticsearch.action.DocWriteResponse;
-import org.elasticsearch.action.delete.DeleteAction;
 import org.elasticsearch.action.get.GetAction;
 import org.elasticsearch.action.get.GetRequest;
 import org.elasticsearch.action.index.IndexAction;
@@ -34,12 +32,12 @@ import org.elasticsearch.index.engine.VersionConflictEngineException;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.index.reindex.DeleteByQueryAction;
 import org.elasticsearch.index.reindex.DeleteByQueryRequest;
 import org.elasticsearch.xpack.core.dataframe.DataFrameField;
 import org.elasticsearch.xpack.core.dataframe.DataFrameMessages;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformCheckpoint;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformConfig;
-import org.elasticsearch.xpack.core.ml.job.persistence.AnomalyDetectorsIndex;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -63,7 +61,7 @@ public class DataFrameTransformsConfigManager {
         this.xContentRegistry = xContentRegistry;
     }
 
-    public void putTransformCheckpoints(DataFrameTransformCheckpoint checkpoint, ActionListener<Boolean> listener) {
+    public void putTransformCheckpoint(DataFrameTransformCheckpoint checkpoint, ActionListener<Boolean> listener) {
         try (XContentBuilder builder = XContentFactory.jsonBuilder()) {
             XContentBuilder source = checkpoint.toXContent(builder, new ToXContent.MapParams(TO_XCONTENT_PARAMS));
 
@@ -148,13 +146,13 @@ public class DataFrameTransformsConfigManager {
         }));
     }
 
-    public void deleteTransformMetaData(String transformId, ActionListener<Boolean> listener) {
+    public void deleteTransform(String transformId, ActionListener<Boolean> listener) {
 
         DeleteByQueryRequest request = new DeleteByQueryRequest()
                 .setAbortOnVersionConflict(false) //since these documents are not updated, a conflict just means it was deleted previously
                 .setSlices(5);
 
-        request.indices(AnomalyDetectorsIndex.jobResultsAliasedName(DataFrameInternalIndex.INDEX_NAME));
+        request.indices(DataFrameInternalIndex.INDEX_NAME);
         BoolQueryBuilder innerBoolQuery = QueryBuilders.boolQuery();
         innerBoolQuery.must(QueryBuilders.termsQuery(DataFrameField.ID.getPreferredName(), transformId));
 
@@ -162,9 +160,9 @@ public class DataFrameTransformsConfigManager {
         request.setQuery(query);
         request.setRefresh(true);
 
-        executeAsyncWithOrigin(client, DATA_FRAME_ORIGIN, DeleteAction.INSTANCE, request, ActionListener.wrap(deleteResponse -> {
+        executeAsyncWithOrigin(client, DATA_FRAME_ORIGIN, DeleteByQueryAction.INSTANCE, request, ActionListener.wrap(deleteResponse -> {
 
-            if (deleteResponse.getResult() == DocWriteResponse.Result.NOT_FOUND) {
+            if (deleteResponse.getDeleted() == 0) {
                 listener.onFailure(new ResourceNotFoundException(
                         DataFrameMessages.getMessage(DataFrameMessages.REST_DATA_FRAME_UNKNOWN_TRANSFORM, transformId)));
                 return;

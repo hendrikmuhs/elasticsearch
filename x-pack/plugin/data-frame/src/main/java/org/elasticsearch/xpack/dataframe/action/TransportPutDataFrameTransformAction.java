@@ -119,7 +119,7 @@ public class TransportPutDataFrameTransformAction
                                     listener.onResponse(new PutDataFrameTransformAction.Response(true));
                         }, startPersistentTaskException -> {
                             // delete the otherwise orphaned transform configuration, for now we do not delete the destination index
-                            dataFrameTransformsConfigManager.deleteTransformMetaData(transformId, ActionListener.wrap(r2 -> {
+                            dataFrameTransformsConfigManager.deleteTransform(transformId, ActionListener.wrap(r2 -> {
                                         logger.debug("Deleted data frame transform [{}] configuration from data frame configuration index",
                                                 transformId);
                                         listener.onFailure(

@@ -25,17 +25,8 @@ import static org.elasticsearch.test.TestMatchers.matchesPattern;
 public class DataFrameTransformCheckpointTests extends AbstractSerializingDataFrameTestCase<DataFrameTransformCheckpoint> {
 
     public static DataFrameTransformCheckpoint randomDataFrameTransformCheckpoints() {
-
-        Map<String, long[]> checkpointsByIndex = new TreeMap<>();
-        for (int i = 0; i < randomIntBetween(1, 10); ++i) {
-            List<Long> checkpoints = new ArrayList<>();
-            for (int j = 0; j < randomIntBetween(1, 20); ++j) {
-                checkpoints.add(randomNonNegativeLong());
-            }
-            checkpointsByIndex.put(randomAlphaOfLengthBetween(1, 10), checkpoints.stream().mapToLong(l -> l).toArray());
-        }
         return new DataFrameTransformCheckpoint(randomAlphaOfLengthBetween(1, 10), randomNonNegativeLong(), randomNonNegativeLong(),
-                checkpointsByIndex, randomNonNegativeLong());
+                randomCheckpointsByIndex(), randomNonNegativeLong());
     }
 
     @Override
@@ -90,6 +81,54 @@ public class DataFrameTransformCheckpointTests extends AbstractSerializingDataFr
             assertThat(doc, matchesPattern(".*\"timestamp_string\"\\s*:\\s*\"2019-01-01T00:00:00.000Z\".*"));
             assertThat(doc, matchesPattern(".*\"time_upper_bound_string\"\\s*:\\s*\"2018-12-24T00:00:00.000Z\".*"));
         }
+    }
 
+    public void testMatches() throws IOException {
+        String id = randomAlphaOfLengthBetween(1, 10);
+        long timestamp = randomNonNegativeLong();
+        long checkpoint = randomNonNegativeLong();
+        Map<String, long[]> checkpointsByIndex = randomCheckpointsByIndex();
+        Map<String, long[]> otherCheckpointsByIndex = new TreeMap<>(checkpointsByIndex);
+        otherCheckpointsByIndex.put(randomAlphaOfLengthBetween(1, 10), new long[] { 1, 2, 3 });
+        long timeUpperBound = randomNonNegativeLong();
+
+        DataFrameTransformCheckpoint dataFrameTransformCheckpoints = new DataFrameTransformCheckpoint(id, timestamp, checkpoint,
+                checkpointsByIndex, timeUpperBound);
+
+        // same
+        assertTrue(dataFrameTransformCheckpoints.matches(dataFrameTransformCheckpoints));
+        DataFrameTransformCheckpoint dataFrameTransformCheckpointsCopy = copyInstance(dataFrameTransformCheckpoints);
+
+        // with copy
+        assertTrue(dataFrameTransformCheckpoints.matches(dataFrameTransformCheckpointsCopy));
+        assertTrue(dataFrameTransformCheckpointsCopy.matches(dataFrameTransformCheckpoints));
+
+        // other id
+        assertFalse(dataFrameTransformCheckpoints
+                .matches(new DataFrameTransformCheckpoint(id + "-1", timestamp, checkpoint, checkpointsByIndex, timeUpperBound)));
+        // other timestamp
+        assertTrue(dataFrameTransformCheckpoints
+                .matches(new DataFrameTransformCheckpoint(id, (timestamp / 2) + 1, checkpoint, checkpointsByIndex, timeUpperBound)));
+        // other checkpoint
+        assertTrue(dataFrameTransformCheckpoints
+                .matches(new DataFrameTransformCheckpoint(id, timestamp, (checkpoint / 2) + 1, checkpointsByIndex, timeUpperBound)));
+        // other index checkpoints
+        assertFalse(dataFrameTransformCheckpoints
+                .matches(new DataFrameTransformCheckpoint(id, timestamp, checkpoint, otherCheckpointsByIndex, timeUpperBound)));
+        // other time upper bound
+        assertTrue(dataFrameTransformCheckpoints
+                .matches(new DataFrameTransformCheckpoint(id, timestamp, checkpoint, checkpointsByIndex, (timeUpperBound / 2) + 1)));
+    }
+
+    private static Map<String, long[]> randomCheckpointsByIndex() {
+        Map<String, long[]> checkpointsByIndex = new TreeMap<>();
+        for (int i = 0; i < randomIntBetween(1, 10); ++i) {
+            List<Long> checkpoints = new ArrayList<>();
+            for (int j = 0; j < randomIntBetween(1, 20); ++j) {
+                checkpoints.add(randomNonNegativeLong());
+            }
+            checkpointsByIndex.put(randomAlphaOfLengthBetween(1, 10), checkpoints.stream().mapToLong(l -> l).toArray());
+        }
+        return checkpointsByIndex;
     }
 }
