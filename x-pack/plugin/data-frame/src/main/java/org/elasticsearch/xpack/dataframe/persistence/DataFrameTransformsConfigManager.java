@@ -152,7 +152,7 @@ public class DataFrameTransformsConfigManager {
                 .setSlices(5);
 
         request.indices(DataFrameInternalIndex.INDEX_NAME);
-        QueryBuilder query = QueryBuilders.termsQuery(DataFrameField.ID.getPreferredName(), transformId);
+        QueryBuilder query = QueryBuilders.termQuery(DataFrameField.ID.getPreferredName(), transformId);
         request.setQuery(query);
         request.setRefresh(true);
 
