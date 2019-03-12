@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
@@ -31,7 +32,20 @@ import java.util.TreeMap;
 import static org.elasticsearch.common.xcontent.ConstructingObjectParser.constructorArg;
 import static org.elasticsearch.common.xcontent.ConstructingObjectParser.optionalConstructorArg;
 
+/**
+ * Checkpoint document to store the checkpoint of a data frame transform
+ *
+ * The fields:
+ *
+ *  timestamp the timestamp when this document has been created
+ *  checkpoint the checkpoint number, incremented for every checkpoint
+ *  indices a map of the indices from the source including all checkpoints of all indices matching the source pattern, shard level
+ *  time_upper_bound for time-based indices this holds the upper time boundary of this checkpoint
+ *
+ */
 public class DataFrameTransformCheckpoint extends AbstractDiffable<DataFrameTransformCheckpoint> implements Writeable, ToXContentObject {
+
+    public static DataFrameTransformCheckpoint EMPTY = new DataFrameTransformCheckpoint("empty", 0L, -1L, Collections.emptyMap(), 0L);
 
     // the timestamp of the checkpoint, mandatory
     public static final ParseField TIMESTAMP = new ParseField("timestamp");
@@ -201,6 +215,14 @@ public class DataFrameTransformCheckpoint extends AbstractDiffable<DataFrameTran
                 && this.timeUpperBoundMillis == that.timeUpperBoundMillis && matches(that);
     }
 
+    /**
+     * Compares 2 checkpoints ignoring some inner fields.
+     *
+     * This is for comparing 2 checkpoints to check whether the data frame transform requires an update
+     *
+     * @param that other checkpoint
+     * @return true if checkpoints match
+     */
     public boolean matches (DataFrameTransformCheckpoint that) {
         if (this == that) {
             return true;

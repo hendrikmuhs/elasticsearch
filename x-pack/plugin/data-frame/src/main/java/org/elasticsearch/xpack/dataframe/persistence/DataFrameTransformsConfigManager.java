@@ -60,12 +60,19 @@ public class DataFrameTransformsConfigManager {
         this.xContentRegistry = xContentRegistry;
     }
 
+    /**
+     * Persist a checkpoint in the internal index
+     *
+     * @param checkpoint the @link{DataFrameTransformCheckpoint}
+     * @param listener listener to call after request has been made
+     */
     public void putTransformCheckpoint(DataFrameTransformCheckpoint checkpoint, ActionListener<Boolean> listener) {
         try (XContentBuilder builder = XContentFactory.jsonBuilder()) {
             XContentBuilder source = checkpoint.toXContent(builder, new ToXContent.MapParams(TO_XCONTENT_PARAMS));
 
             IndexRequest indexRequest = new IndexRequest(DataFrameInternalIndex.INDEX_NAME)
                     .opType(DocWriteRequest.OpType.INDEX)
+                    .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
                     .id(DataFrameTransformCheckpoint.documentId(checkpoint.getId(), checkpoint.getCheckpoint()))
                     .source(source);
 
@@ -78,6 +85,12 @@ public class DataFrameTransformsConfigManager {
         }
     }
 
+    /**
+     * Store the transform configuration in the internal index
+     *
+     * @param transformConfig the @link{DataFrameTransformConfig}
+     * @param listener listener to call after request
+     */
     public void putTransformConfiguration(DataFrameTransformConfig transformConfig, ActionListener<Boolean> listener) {
         try (XContentBuilder builder = XContentFactory.jsonBuilder()) {
             XContentBuilder source = transformConfig.toXContent(builder, new ToXContent.MapParams(TO_XCONTENT_PARAMS));
@@ -109,14 +122,21 @@ public class DataFrameTransformsConfigManager {
         }
     }
 
+    /**
+     * Get a stored checkpoint, requires the transform id as well as the checkpoint id
+     *
+     * @param transformId the transform id
+     * @param checkpointId the checkpoint id
+     * @param resultListener listener to call after request has been made
+     */
     public void getTransformCheckpoint(String transformId, long checkpointId, ActionListener<DataFrameTransformCheckpoint> resultListener) {
         GetRequest getRequest = new GetRequest(DataFrameInternalIndex.INDEX_NAME,
                 DataFrameTransformCheckpoint.documentId(transformId, checkpointId));
         executeAsyncWithOrigin(client, DATA_FRAME_ORIGIN, GetAction.INSTANCE, getRequest, ActionListener.wrap(getResponse -> {
 
             if (getResponse.isExists() == false) {
-                // do not fail if checkpoint does not exist but return null
-                resultListener.onResponse(null);
+                // do not fail if checkpoint does not exist but return an empty checkpoint
+                resultListener.onResponse(DataFrameTransformCheckpoint.EMPTY);
                 return;
             }
             BytesReference source = getResponse.getSourceAsBytesRef();
@@ -124,6 +144,12 @@ public class DataFrameTransformsConfigManager {
         }, resultListener::onFailure));
     }
 
+    /**
+     * Get the transform configuration for a given transform id.
+     *
+     * @param transformId the transform id
+     * @param resultListener listener to call after inner request has returned
+     */
     public void getTransformConfiguration(String transformId, ActionListener<DataFrameTransformConfig> resultListener) {
         GetRequest getRequest = new GetRequest(DataFrameInternalIndex.INDEX_NAME, DataFrameTransformConfig.documentId(transformId));
         executeAsyncWithOrigin(client, DATA_FRAME_ORIGIN, GetAction.INSTANCE, getRequest, ActionListener.wrap(getResponse -> {
@@ -145,6 +171,14 @@ public class DataFrameTransformsConfigManager {
         }));
     }
 
+    /**
+     * Delete a transform from the internal index.
+     *
+     * This deletes the configuration and all other documents corresponding to the transform id (e.g. checkpoints).
+     *
+     * @param transformId the transform id
+     * @param listener listener to call after inner request returned
+     */
     public void deleteTransform(String transformId, ActionListener<Boolean> listener) {
 
         DeleteByQueryRequest request = new DeleteByQueryRequest()

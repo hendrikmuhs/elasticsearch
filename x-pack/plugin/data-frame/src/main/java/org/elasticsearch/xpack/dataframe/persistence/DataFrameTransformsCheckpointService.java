@@ -25,6 +25,14 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 
+/**
+ * DataFrameTransform Checkpoint Service
+ *
+ * Allows checkpointing a source of a data frame transform which includes all relevant checkpoints of the source.
+ *
+ * This will be used to checkpoint a transform, detect changes, run the transform in continuous mode.
+ *
+ */
 public class DataFrameTransformsCheckpointService {
 
     private static final Logger logger = LogManager.getLogger(DataFrameTransformsCheckpointService.class);
@@ -35,10 +43,22 @@ public class DataFrameTransformsCheckpointService {
         this.client = client;
     }
 
+    /**
+     * Get a checkpoint that is not attached to an id. E.g. for change detection.
+     *
+     * @param transformConfig the @link{DataFrameTransformConfig}
+     * @param listener listener to call after inner request returned
+     */
     public void getCheckpoint(DataFrameTransformConfig transformConfig, ActionListener<DataFrameTransformCheckpoint> listener) {
         getCheckpoint(transformConfig, -1L, listener);
     }
 
+    /**
+     * Get a checkpoint with an id, used to store a checkpoint.
+     *
+     * @param transformConfig the @link{DataFrameTransformConfig}
+     * @param listener listener to call after inner request returned
+     */
     public void getCheckpoint(DataFrameTransformConfig transformConfig, long checkpointId,
             ActionListener<DataFrameTransformCheckpoint> listener) {
         long timestamp = System.currentTimeMillis();
