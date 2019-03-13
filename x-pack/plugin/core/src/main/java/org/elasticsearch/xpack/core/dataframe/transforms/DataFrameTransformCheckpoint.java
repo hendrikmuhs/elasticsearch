@@ -7,7 +7,6 @@
 package org.elasticsearch.xpack.core.dataframe.transforms;
 
 import org.elasticsearch.ElasticsearchParseException;
-import org.elasticsearch.cluster.AbstractDiffable;
 import org.elasticsearch.common.ParseField;
 import org.elasticsearch.common.ParsingException;
 import org.elasticsearch.common.io.stream.StreamInput;
@@ -20,8 +19,6 @@ import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.xpack.core.dataframe.DataFrameField;
 
 import java.io.IOException;
-import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
@@ -43,11 +40,12 @@ import static org.elasticsearch.common.xcontent.ConstructingObjectParser.optiona
  *  time_upper_bound for time-based indices this holds the upper time boundary of this checkpoint
  *
  */
-public class DataFrameTransformCheckpoint extends AbstractDiffable<DataFrameTransformCheckpoint> implements Writeable, ToXContentObject {
+public class DataFrameTransformCheckpoint implements Writeable, ToXContentObject {
 
     public static DataFrameTransformCheckpoint EMPTY = new DataFrameTransformCheckpoint("empty", 0L, -1L, Collections.emptyMap(), 0L);
 
     // the timestamp of the checkpoint, mandatory
+    public static final ParseField TIMESTAMP_MILLIS = new ParseField("timestamp_millis");
     public static final ParseField TIMESTAMP = new ParseField("timestamp");
 
     // the own checkpoint
@@ -58,6 +56,7 @@ public class DataFrameTransformCheckpoint extends AbstractDiffable<DataFrameTran
 
     // checkpoint for for time based sync
     // TODO: consider a lower bound for usecases where you want to transform on a window of a stream
+    public static final ParseField TIME_UPPER_BOUND_MILLIS = new ParseField("time_upper_bound_millis");
     public static final ParseField TIME_UPPER_BOUND = new ParseField("time_upper_bound");
 
     private static final String NAME = "data_frame_transform_checkpoint";
@@ -90,7 +89,7 @@ public class DataFrameTransformCheckpoint extends AbstractDiffable<DataFrameTran
         parser.declareString(constructorArg(), DataFrameField.ID);
 
         // note: this is never parsed from the outside where timestamp can be formatted as date time
-        parser.declareLong(constructorArg(), TIMESTAMP);
+        parser.declareLong(constructorArg(), TIMESTAMP_MILLIS);
         parser.declareLong(constructorArg(), CHECKPOINT);
 
         parser.declareObject(constructorArg(), (p,c) -> {
@@ -112,7 +111,7 @@ public class DataFrameTransformCheckpoint extends AbstractDiffable<DataFrameTran
             }
             return checkPointsByIndexName;
         }, INDICES);
-        parser.declareLong(optionalConstructorArg(), TIME_UPPER_BOUND);
+        parser.declareLong(optionalConstructorArg(), TIME_UPPER_BOUND_MILLIS);
         parser.declareString(optionalConstructorArg(), DataFrameField.INDEX_DOC_TYPE);
 
         return parser;
@@ -122,7 +121,7 @@ public class DataFrameTransformCheckpoint extends AbstractDiffable<DataFrameTran
         this.id = id;
         this.timestampMillis = timestamp.longValue();
         this.checkpoint = checkpoint;
-        this.indicesCheckpoints = checkpoints;
+        this.indicesCheckpoints = Collections.unmodifiableMap(checkpoints);
         this.timeUpperBoundMillis = timeUpperBound == null ? 0 : timeUpperBound.longValue();
     }
 
@@ -136,7 +135,6 @@ public class DataFrameTransformCheckpoint extends AbstractDiffable<DataFrameTran
 
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
-        final String humanReadableSuffix = "_string";
         builder.startObject();
 
         // the id, doc_type and checkpoint is only internally used for storage, the user-facing version gets embedded
@@ -146,18 +144,10 @@ public class DataFrameTransformCheckpoint extends AbstractDiffable<DataFrameTran
             builder.field(DataFrameField.INDEX_DOC_TYPE.getPreferredName(), NAME);
         }
 
-        builder.field(TIMESTAMP.getPreferredName(), timestampMillis);
-        if (timeUpperBoundMillis > 0) {
-            builder.field(TIME_UPPER_BOUND.getPreferredName(), timeUpperBoundMillis);
-        }
+        builder.timeField(TIMESTAMP_MILLIS.getPreferredName(), TIMESTAMP.getPreferredName(), timestampMillis);
 
-        if (params.paramAsBoolean("human", false)) {
-            // be human readable on API level
-            builder.field(TIMESTAMP.getPreferredName() + humanReadableSuffix, Instant.ofEpochMilli(timestampMillis).atZone(ZoneOffset.UTC));
-            if (timeUpperBoundMillis > 0) {
-                builder.field(TIME_UPPER_BOUND.getPreferredName() + humanReadableSuffix,
-                        Instant.ofEpochMilli(timeUpperBoundMillis).atZone(ZoneOffset.UTC));
-            }
+        if (timeUpperBoundMillis > 0) {
+            builder.timeField(TIME_UPPER_BOUND_MILLIS.getPreferredName(), TIME_UPPER_BOUND.getPreferredName(), timeUpperBoundMillis);
         }
 
         builder.startObject(INDICES.getPreferredName());
@@ -211,6 +201,7 @@ public class DataFrameTransformCheckpoint extends AbstractDiffable<DataFrameTran
 
         final DataFrameTransformCheckpoint that = (DataFrameTransformCheckpoint) other;
 
+        // compare the timestamp, id, checkpoint and than call matches for the rest
         return this.timestampMillis == that.timestampMillis && this.checkpoint == that.checkpoint
                 && this.timeUpperBoundMillis == that.timeUpperBoundMillis && matches(that);
     }

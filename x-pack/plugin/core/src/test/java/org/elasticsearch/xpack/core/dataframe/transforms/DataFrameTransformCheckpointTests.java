@@ -72,14 +72,13 @@ public class DataFrameTransformCheckpointTests extends AbstractSerializingDataFr
                 1546300800000L, randomNonNegativeLong(), Collections.emptyMap(), 1545609600000L);
 
         try (XContentBuilder xContentBuilder = XContentFactory.jsonBuilder()) {
-            ToXContent.Params params = new ToXContent.MapParams(Collections.singletonMap("human", "true"));
-
-            XContentBuilder content = dataFrameTransformCheckpoints.toXContent(xContentBuilder, params);
+            xContentBuilder.humanReadable(true);
+            XContentBuilder content = dataFrameTransformCheckpoints.toXContent(xContentBuilder, ToXContent.EMPTY_PARAMS);
             String doc = Strings.toString(content);
-            assertThat(doc, matchesPattern(".*\"timestamp\"\\s*:\\s*1546300800000.*"));
-            assertThat(doc, matchesPattern(".*\"time_upper_bound\"\\s*:\\s*1545609600000.*"));
-            assertThat(doc, matchesPattern(".*\"timestamp_string\"\\s*:\\s*\"2019-01-01T00:00:00.000Z\".*"));
-            assertThat(doc, matchesPattern(".*\"time_upper_bound_string\"\\s*:\\s*\"2018-12-24T00:00:00.000Z\".*"));
+            assertThat(doc, matchesPattern(".*\"timestamp_millis\"\\s*:\\s*1546300800000.*"));
+            assertThat(doc, matchesPattern(".*\"time_upper_bound_millis\"\\s*:\\s*1545609600000.*"));
+            assertThat(doc, matchesPattern(".*\"timestamp\"\\s*:\\s*\"2019-01-01T00:00:00.000Z\".*"));
+            assertThat(doc, matchesPattern(".*\"time_upper_bound\"\\s*:\\s*\"2018-12-24T00:00:00.000Z\".*"));
         }
     }
 
