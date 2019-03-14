@@ -57,8 +57,8 @@ import org.elasticsearch.xpack.dataframe.action.TransportPutDataFrameTransformAc
 import org.elasticsearch.xpack.dataframe.action.TransportStartDataFrameTransformAction;
 import org.elasticsearch.xpack.dataframe.action.TransportStartDataFrameTransformTaskAction;
 import org.elasticsearch.xpack.dataframe.action.TransportStopDataFrameTransformAction;
+import org.elasticsearch.xpack.dataframe.checkpoint.DataFrameTransformsCheckpointService;
 import org.elasticsearch.xpack.dataframe.persistence.DataFrameInternalIndex;
-import org.elasticsearch.xpack.dataframe.persistence.DataFrameTransformsCheckpointService;
 import org.elasticsearch.xpack.dataframe.persistence.DataFrameTransformsConfigManager;
 import org.elasticsearch.xpack.dataframe.rest.action.RestDeleteDataFrameTransformAction;
 import org.elasticsearch.xpack.dataframe.rest.action.RestGetDataFrameTransformsAction;

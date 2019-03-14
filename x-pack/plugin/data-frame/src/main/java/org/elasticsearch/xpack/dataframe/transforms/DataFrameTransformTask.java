@@ -34,7 +34,7 @@ import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformState
 import org.elasticsearch.xpack.core.indexing.IndexerState;
 import org.elasticsearch.xpack.core.scheduler.SchedulerEngine;
 import org.elasticsearch.xpack.core.scheduler.SchedulerEngine.Event;
-import org.elasticsearch.xpack.dataframe.persistence.DataFrameTransformsCheckpointService;
+import org.elasticsearch.xpack.dataframe.checkpoint.DataFrameTransformsCheckpointService;
 import org.elasticsearch.xpack.dataframe.persistence.DataFrameTransformsConfigManager;
 
 import java.util.Map;
