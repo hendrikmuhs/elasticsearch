@@ -170,7 +170,7 @@ public class DataFrameTransformsCheckpointServiceTests extends ESTestCase {
             expectedCheckpoints.put(index.getName(), checkpoints.stream().mapToLong(l -> l).toArray());
         }
         // shuffle the shard stats
-        Collections.shuffle(shardStats);
+        Collections.shuffle(shardStats, random());
         ShardStats[] shardStatsArray = shardStats.toArray(new ShardStats[0]);
         return shardStatsArray;
     }
