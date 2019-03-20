@@ -38,9 +38,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import static org.hamcrest.Matchers.containsString;
 
@@ -48,10 +50,11 @@ public class DataFrameTransformsCheckpointServiceTests extends ESTestCase {
 
     public void testExtractIndexCheckpoints() {
         Map<String, long[]> expectedCheckpoints = new HashMap<>();
+        Set<String> indices = randomUserIndices();
 
-        ShardStats[] shardStatsArray = createRandomShardStats(expectedCheckpoints, false, false);
+        ShardStats[] shardStatsArray = createRandomShardStats(expectedCheckpoints, indices, false, false);
 
-        Map<String, long[]> checkpoints = DataFrameTransformsCheckpointService.extractIndexCheckPoints(shardStatsArray);
+        Map<String, long[]> checkpoints = DataFrameTransformsCheckpointService.extractIndexCheckPoints(shardStatsArray, indices);
 
         assertEquals(expectedCheckpoints.size(), checkpoints.size());
         assertEquals(expectedCheckpoints.keySet(), checkpoints.keySet());
@@ -64,10 +67,11 @@ public class DataFrameTransformsCheckpointServiceTests extends ESTestCase {
 
     public void testExtractIndexCheckpointsLostPrimaries() {
         Map<String, long[]> expectedCheckpoints = new HashMap<>();
+        Set<String> indices = randomUserIndices();
 
-        ShardStats[] shardStatsArray = createRandomShardStats(expectedCheckpoints, true, false);
+        ShardStats[] shardStatsArray = createRandomShardStats(expectedCheckpoints, indices, true, false);
 
-        Map<String, long[]> checkpoints = DataFrameTransformsCheckpointService.extractIndexCheckPoints(shardStatsArray);
+        Map<String, long[]> checkpoints = DataFrameTransformsCheckpointService.extractIndexCheckPoints(shardStatsArray, indices);
 
         assertEquals(expectedCheckpoints.size(), checkpoints.size());
         assertEquals(expectedCheckpoints.keySet(), checkpoints.keySet());
@@ -80,25 +84,48 @@ public class DataFrameTransformsCheckpointServiceTests extends ESTestCase {
 
     public void testExtractIndexCheckpointsInconsistentGlobalCheckpoints() {
         Map<String, long[]> expectedCheckpoints = new HashMap<>();
+        Set<String> indices = randomUserIndices();
 
-        ShardStats[] shardStatsArray = createRandomShardStats(expectedCheckpoints, randomBoolean(), true);
+        ShardStats[] shardStatsArray = createRandomShardStats(expectedCheckpoints, indices, randomBoolean(), true);
 
         // fail
         CheckpointException e = expectThrows(CheckpointException.class,
-                () -> DataFrameTransformsCheckpointService.extractIndexCheckPoints(shardStatsArray));
+                () -> DataFrameTransformsCheckpointService.extractIndexCheckPoints(shardStatsArray, indices));
 
         assertThat(e.getMessage(), containsString("Global checkpoints mismatch"));    }
+
+    /**
+     * Create a random set of 3 index names
+     * @return set of indices a simulated user has access to
+     */
+    private static Set<String> randomUserIndices() {
+        Set<String> indices = new HashSet<>();
+
+        // never create an empty set
+        if (randomBoolean()) {
+            indices.add("index-1");
+        } else {
+            indices.add("index-2");
+        }
+        if (randomBoolean()) {
+            indices.add("index-3");
+        }
+        return indices;
+    }
 
     /**
      * create a ShardStats for testing with random fuzzing
      *
      * @param expectedCheckpoints output parameter to return the checkpoints to expect
+     * @param userIndices set of indices that are visible
      * @param skipPrimaries whether some shards do not have a primary shard at random
      * @param inconsistentGlobalCheckpoints whether to introduce inconsistent global checkpoints
      * @return array of ShardStats
      */
-    private ShardStats[] createRandomShardStats(Map<String, long[]> expectedCheckpoints, boolean skipPrimaries,
-            boolean inconsistentGlobalCheckpoints) {
+    private static ShardStats[] createRandomShardStats(Map<String, long[]> expectedCheckpoints, Set<String> userIndices,
+            boolean skipPrimaries, boolean inconsistentGlobalCheckpoints) {
+
+        // always create the full list
         List<Index> indices = new ArrayList<>();
         indices.add(new Index("index-1", UUIDs.randomBase64UUID(random())));
         indices.add(new Index("index-2", UUIDs.randomBase64UUID(random())));
@@ -167,7 +194,9 @@ public class DataFrameTransformsCheckpointServiceTests extends ESTestCase {
                 }
             }
 
-            expectedCheckpoints.put(index.getName(), checkpoints.stream().mapToLong(l -> l).toArray());
+            if (userIndices.contains(index.getName())) {
+                expectedCheckpoints.put(index.getName(), checkpoints.stream().mapToLong(l -> l).toArray());
+            }
         }
         // shuffle the shard stats
         Collections.shuffle(shardStats, random());
