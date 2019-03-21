@@ -145,7 +145,8 @@ public class DataFrameTransformsConfigManager {
     }
 
     /**
-     * Get the transform configuration for a given transform id.
+     * Get the transform configuration for a given transform id. This function is only for internal use. For transforms returned via GET
+     * data_frame/transforms, see the TransportGetDataFrameTransformsAction
      *
      * @param transformId the transform id
      * @param resultListener listener to call after inner request has returned

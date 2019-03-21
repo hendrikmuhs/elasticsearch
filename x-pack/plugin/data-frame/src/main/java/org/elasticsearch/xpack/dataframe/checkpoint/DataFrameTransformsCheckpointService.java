@@ -98,12 +98,13 @@ public class DataFrameTransformsCheckpointService {
     static Map<String, long[]> extractIndexCheckPoints(ShardStats[] shards, Set<String> userIndices) {
         Map<String, long[]> checkpointsByIndex = new TreeMap<>();
 
-        // 2nd pass
+        // go through the list of indices and extract the corresponding checkpoints
+        // beware: this needs #indices * #shards runs
         for (String indexName : userIndices) {
             TreeMap<Integer, Long> checkpoints = new TreeMap<>();
             for (ShardStats shard : shards) {
                 if (shard.getShardRouting().getIndexName().equals(indexName)) {
-                    // note: in case of replicas this gets overridden
+                    // if we already extracted the checkpoint it must match
                     if (checkpoints.containsKey(shard.getShardRouting().getId())) {
                         if (checkpoints.get(shard.getShardRouting().getId()) != shard.getSeqNoStats().getGlobalCheckpoint()) {
                             throw new CheckpointException("Global checkpoints mismatch for index [" + indexName + "] between shards of id ["
