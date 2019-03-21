@@ -111,8 +111,8 @@ public class DataFrameTransformsConfigManagerTests extends DataFrameSingleNodeTe
         assertAsync(listener -> transformsConfigManager.putTransformCheckpoint(checkpoint, listener), true, null, null);
 
         // read
-        assertAsync(listener -> transformsConfigManager.getTransformCheckpoint(checkpoint.getTransformId(), checkpoint.getCheckpoint(), listener),
-                checkpoint, null, null);
+        assertAsync(listener -> transformsConfigManager.getTransformCheckpoint(checkpoint.getTransformId(), checkpoint.getCheckpoint(),
+                listener), checkpoint, null, null);
 
         // delete
         assertAsync(listener -> transformsConfigManager.deleteTransform(checkpoint.getTransformId(), listener), true, null, null);
@@ -125,7 +125,7 @@ public class DataFrameTransformsConfigManagerTests extends DataFrameSingleNodeTe
         });
 
         // getting a non-existing checkpoint returns null
-        assertAsync(listener -> transformsConfigManager.getTransformCheckpoint(checkpoint.getTransformId(), checkpoint.getCheckpoint(), listener),
-                DataFrameTransformCheckpoint.EMPTY, null, null);
+        assertAsync(listener -> transformsConfigManager.getTransformCheckpoint(checkpoint.getTransformId(), checkpoint.getCheckpoint(),
+                listener), DataFrameTransformCheckpoint.EMPTY, null, null);
     }
 }
