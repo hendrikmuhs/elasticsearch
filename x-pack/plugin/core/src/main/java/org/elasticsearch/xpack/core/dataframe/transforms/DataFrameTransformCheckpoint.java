@@ -242,6 +242,10 @@ public class DataFrameTransformCheckpoint implements Writeable, ToXContentObject
     }
 
     public static String documentId(String transformId, long checkpoint) {
+        if (checkpoint < 0) {
+            throw new IllegalArgumentException("checkpoint must be a positive number");
+        }
+
         return NAME + "-" + transformId + "-" + checkpoint;
     }
 

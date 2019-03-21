@@ -44,7 +44,7 @@ public class DataFrameTransformsCheckpointService {
     }
 
     /**
-     * Get a checkpoint that is not attached to an id. E.g. for change detection.
+     * Get an unnumbered checkpoint. These checkpoints are for persistence but comparing state.
      *
      * @param transformConfig the @link{DataFrameTransformConfig}
      * @param listener listener to call after inner request returned
@@ -54,9 +54,10 @@ public class DataFrameTransformsCheckpointService {
     }
 
     /**
-     * Get a checkpoint with an id, used to store a checkpoint.
+     * Get a checkpoint, used to store a checkpoint.
      *
      * @param transformConfig the @link{DataFrameTransformConfig}
+     * @param checkpoint the number of the checkpoint
      * @param listener listener to call after inner request returned
      */
     public void getCheckpoint(DataFrameTransformConfig transformConfig, long checkpoint,
