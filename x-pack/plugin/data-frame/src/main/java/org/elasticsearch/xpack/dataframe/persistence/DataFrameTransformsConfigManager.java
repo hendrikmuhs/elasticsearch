@@ -126,12 +126,12 @@ public class DataFrameTransformsConfigManager {
      * Get a stored checkpoint, requires the transform id as well as the checkpoint id
      *
      * @param transformId the transform id
-     * @param checkpointId the checkpoint id
+     * @param checkpoint the checkpoint
      * @param resultListener listener to call after request has been made
      */
-    public void getTransformCheckpoint(String transformId, long checkpointId, ActionListener<DataFrameTransformCheckpoint> resultListener) {
+    public void getTransformCheckpoint(String transformId, long checkpoint, ActionListener<DataFrameTransformCheckpoint> resultListener) {
         GetRequest getRequest = new GetRequest(DataFrameInternalIndex.INDEX_NAME,
-                DataFrameTransformCheckpoint.documentId(transformId, checkpointId));
+                DataFrameTransformCheckpoint.documentId(transformId, checkpoint));
         executeAsyncWithOrigin(client, DATA_FRAME_ORIGIN, GetAction.INSTANCE, getRequest, ActionListener.wrap(getResponse -> {
 
             if (getResponse.isExists() == false) {

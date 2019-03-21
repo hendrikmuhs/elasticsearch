@@ -240,8 +240,8 @@ public class DataFrameTransformCheckpoint implements Writeable, ToXContentObject
         return lenient ? LENIENT_PARSER.apply(parser, null) : STRICT_PARSER.apply(parser, null);
     }
 
-    public static String documentId(String transformId, long checkpointId) {
-        return NAME + "-" + transformId + "-" + checkpointId;
+    public static String documentId(String transformId, long checkpoint) {
+        return NAME + "-" + transformId + "-" + checkpoint;
     }
 
     private static Map<String, long[]> readCheckpoints(Map<String, Object> readMap) {

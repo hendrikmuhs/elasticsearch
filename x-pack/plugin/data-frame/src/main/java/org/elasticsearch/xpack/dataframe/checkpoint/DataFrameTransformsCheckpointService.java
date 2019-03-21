@@ -59,7 +59,7 @@ public class DataFrameTransformsCheckpointService {
      * @param transformConfig the @link{DataFrameTransformConfig}
      * @param listener listener to call after inner request returned
      */
-    public void getCheckpoint(DataFrameTransformConfig transformConfig, long checkpointId,
+    public void getCheckpoint(DataFrameTransformConfig transformConfig, long checkpoint,
             ActionListener<DataFrameTransformCheckpoint> listener) {
         long timestamp = System.currentTimeMillis();
 
@@ -82,7 +82,7 @@ public class DataFrameTransformsCheckpointService {
 
                                 Map<String, long[]> checkpointsByIndex = extractIndexCheckPoints(response.getShards(), userIndices);
                                 DataFrameTransformCheckpoint checkpointDoc = new DataFrameTransformCheckpoint(transformConfig.getId(),
-                                        timestamp, checkpointId, checkpointsByIndex, timeUpperBound);
+                                        timestamp, checkpoint, checkpointsByIndex, timeUpperBound);
                                 listener.onResponse(checkpointDoc);
 
                             }, IndicesStatsRequestException -> {
