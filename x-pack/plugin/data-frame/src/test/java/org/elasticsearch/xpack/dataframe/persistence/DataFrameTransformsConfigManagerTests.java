@@ -111,21 +111,21 @@ public class DataFrameTransformsConfigManagerTests extends DataFrameSingleNodeTe
         assertAsync(listener -> transformsConfigManager.putTransformCheckpoint(checkpoint, listener), true, null, null);
 
         // read
-        assertAsync(listener -> transformsConfigManager.getTransformCheckpoint(checkpoint.getId(), checkpoint.getCheckpoint(), listener),
+        assertAsync(listener -> transformsConfigManager.getTransformCheckpoint(checkpoint.getTransformId(), checkpoint.getCheckpoint(), listener),
                 checkpoint, null, null);
 
         // delete
-        assertAsync(listener -> transformsConfigManager.deleteTransform(checkpoint.getId(), listener), true, null, null);
+        assertAsync(listener -> transformsConfigManager.deleteTransform(checkpoint.getTransformId(), listener), true, null, null);
 
         // delete again
-        assertAsync(listener -> transformsConfigManager.deleteTransform(checkpoint.getId(), listener), (Boolean) null, null, e -> {
+        assertAsync(listener -> transformsConfigManager.deleteTransform(checkpoint.getTransformId(), listener), (Boolean) null, null, e -> {
             assertEquals(ResourceNotFoundException.class, e.getClass());
-            assertEquals(DataFrameMessages.getMessage(DataFrameMessages.REST_DATA_FRAME_UNKNOWN_TRANSFORM, checkpoint.getId()),
+            assertEquals(DataFrameMessages.getMessage(DataFrameMessages.REST_DATA_FRAME_UNKNOWN_TRANSFORM, checkpoint.getTransformId()),
                     e.getMessage());
         });
 
         // getting a non-existing checkpoint returns null
-        assertAsync(listener -> transformsConfigManager.getTransformCheckpoint(checkpoint.getId(), checkpoint.getCheckpoint(), listener),
+        assertAsync(listener -> transformsConfigManager.getTransformCheckpoint(checkpoint.getTransformId(), checkpoint.getCheckpoint(), listener),
                 DataFrameTransformCheckpoint.EMPTY, null, null);
     }
 }

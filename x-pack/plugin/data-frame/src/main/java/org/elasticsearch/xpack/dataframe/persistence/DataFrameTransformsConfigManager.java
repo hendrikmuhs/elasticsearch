@@ -73,7 +73,7 @@ public class DataFrameTransformsConfigManager {
             IndexRequest indexRequest = new IndexRequest(DataFrameInternalIndex.INDEX_NAME)
                     .opType(DocWriteRequest.OpType.INDEX)
                     .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
-                    .id(DataFrameTransformCheckpoint.documentId(checkpoint.getId(), checkpoint.getCheckpoint()))
+                    .id(DataFrameTransformCheckpoint.documentId(checkpoint.getTransformId(), checkpoint.getCheckpoint()))
                     .source(source);
 
             executeAsyncWithOrigin(client, DATA_FRAME_ORIGIN, IndexAction.INSTANCE, indexRequest, ActionListener.wrap(r -> {

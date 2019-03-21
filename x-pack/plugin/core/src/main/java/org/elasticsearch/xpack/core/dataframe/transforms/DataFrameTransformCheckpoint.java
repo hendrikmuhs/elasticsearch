@@ -64,7 +64,7 @@ public class DataFrameTransformCheckpoint implements Writeable, ToXContentObject
     private static final ConstructingObjectParser<DataFrameTransformCheckpoint, Void> STRICT_PARSER = createParser(false);
     private static final ConstructingObjectParser<DataFrameTransformCheckpoint, Void> LENIENT_PARSER = createParser(true);
 
-    private final String id;
+    private final String transformId;
     private final long timestampMillis;
     private final long checkpoint;
     private final Map<String, long[]> indicesCheckpoints;
@@ -117,8 +117,8 @@ public class DataFrameTransformCheckpoint implements Writeable, ToXContentObject
         return parser;
     }
 
-    public DataFrameTransformCheckpoint(String id, Long timestamp, Long checkpoint, Map<String, long[]> checkpoints, Long timeUpperBound) {
-        this.id = id;
+    public DataFrameTransformCheckpoint(String transformId, Long timestamp, Long checkpoint, Map<String, long[]> checkpoints, Long timeUpperBound) {
+        this.transformId = transformId;
         this.timestampMillis = timestamp.longValue();
         this.checkpoint = checkpoint;
         this.indicesCheckpoints = Collections.unmodifiableMap(checkpoints);
@@ -126,7 +126,7 @@ public class DataFrameTransformCheckpoint implements Writeable, ToXContentObject
     }
 
     public DataFrameTransformCheckpoint(StreamInput in) throws IOException {
-        this.id = in.readString();
+        this.transformId = in.readString();
         this.timestampMillis = in.readLong();
         this.checkpoint = in.readLong();
         this.indicesCheckpoints = readCheckpoints(in.readMap());
@@ -139,7 +139,7 @@ public class DataFrameTransformCheckpoint implements Writeable, ToXContentObject
 
         // the id, doc_type and checkpoint is only internally used for storage, the user-facing version gets embedded
         if (params.paramAsBoolean(DataFrameField.FOR_INTERNAL_STORAGE, false)) {
-            builder.field(DataFrameField.ID.getPreferredName(), id);
+            builder.field(DataFrameField.ID.getPreferredName(), transformId);
             builder.field(CHECKPOINT.getPreferredName(), checkpoint);
             builder.field(DataFrameField.INDEX_DOC_TYPE.getPreferredName(), NAME);
         }
@@ -160,8 +160,8 @@ public class DataFrameTransformCheckpoint implements Writeable, ToXContentObject
         return builder;
     }
 
-    public String getId() {
-        return id;
+    public String getTransformId() {
+        return transformId;
     }
 
     public long getTimestamp() {
@@ -182,7 +182,7 @@ public class DataFrameTransformCheckpoint implements Writeable, ToXContentObject
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
-        out.writeString(id);
+        out.writeString(transformId);
         out.writeLong(timestampMillis);
         out.writeLong(checkpoint);
         out.writeGenericValue(indicesCheckpoints);
@@ -219,7 +219,7 @@ public class DataFrameTransformCheckpoint implements Writeable, ToXContentObject
             return true;
         }
 
-        return Objects.equals(this.id, that.id)
+        return Objects.equals(this.transformId, that.transformId)
                 && this.indicesCheckpoints.size() == that.indicesCheckpoints.size() // quick check
                 // do the expensive deep equal operation last
                 && this.indicesCheckpoints.entrySet().stream()
@@ -228,7 +228,7 @@ public class DataFrameTransformCheckpoint implements Writeable, ToXContentObject
 
     @Override
     public int hashCode() {
-        int hash = Objects.hash(id, timestampMillis, checkpoint, timeUpperBoundMillis);
+        int hash = Objects.hash(transformId, timestampMillis, checkpoint, timeUpperBoundMillis);
 
         for (Entry<String, long[]> e : indicesCheckpoints.entrySet()) {
             hash = 31 * hash + Objects.hash(e.getKey(), Arrays.hashCode(e.getValue()));
