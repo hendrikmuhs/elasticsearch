@@ -96,29 +96,40 @@ public class DataFrameTransformsCheckpointService {
     }
 
     static Map<String, long[]> extractIndexCheckPoints(ShardStats[] shards, Set<String> userIndices) {
-        Map<String, long[]> checkpointsByIndex = new TreeMap<>();
+        Map<String, TreeMap<Integer, Long>> checkpointsByIndex = new TreeMap<>();
 
-        // go through the list of indices and extract the corresponding checkpoints
-        // beware: this needs #indices * #shards runs
-        for (String indexName : userIndices) {
-            TreeMap<Integer, Long> checkpoints = new TreeMap<>();
-            for (ShardStats shard : shards) {
-                if (shard.getShardRouting().getIndexName().equals(indexName)) {
-                    // if we already extracted the checkpoint it must match
+        for (ShardStats shard : shards) {
+            String indexName = shard.getShardRouting().getIndexName();
+            if (userIndices.contains(indexName)) {
+                if (checkpointsByIndex.containsKey(indexName)) {
+                    // we have already seen this index, just check/add shards
+                    TreeMap<Integer, Long> checkpoints = checkpointsByIndex.get(indexName);
                     if (checkpoints.containsKey(shard.getShardRouting().getId())) {
+                        // there is already a checkpoint entry for this index/shard combination, check if they match
                         if (checkpoints.get(shard.getShardRouting().getId()) != shard.getSeqNoStats().getGlobalCheckpoint()) {
                             throw new CheckpointException("Global checkpoints mismatch for index [" + indexName + "] between shards of id ["
                                     + shard.getShardRouting().getId() + "]");
                         }
                     } else {
+                        // 1st time we see this shard for this index, add the entry for the shard
                         checkpoints.put(shard.getShardRouting().getId(), shard.getSeqNoStats().getGlobalCheckpoint());
                     }
+                } else {
+                    // 1st time we see this index, create an entry for the index and add the shard checkpoint
+                    checkpointsByIndex.put(indexName, new TreeMap<>());
+                    checkpointsByIndex.get(indexName).put(shard.getShardRouting().getId(), shard.getSeqNoStats().getGlobalCheckpoint());
                 }
             }
-            checkpointsByIndex.put(indexName, checkpoints.values().stream().mapToLong(l -> l).toArray());
         }
 
-        return checkpointsByIndex;
+        // create the final structure
+        Map<String, long[]> checkpointsByIndexReduced = new TreeMap<>();
+
+        checkpointsByIndex.forEach((indexName, checkpoints) -> {
+            checkpointsByIndexReduced.put(indexName, checkpoints.values().stream().mapToLong(l -> l).toArray());
+        });
+
+        return checkpointsByIndexReduced;
     }
 
 }
