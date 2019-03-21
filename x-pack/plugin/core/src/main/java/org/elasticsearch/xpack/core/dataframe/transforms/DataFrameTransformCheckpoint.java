@@ -117,7 +117,8 @@ public class DataFrameTransformCheckpoint implements Writeable, ToXContentObject
         return parser;
     }
 
-    public DataFrameTransformCheckpoint(String transformId, Long timestamp, Long checkpoint, Map<String, long[]> checkpoints, Long timeUpperBound) {
+    public DataFrameTransformCheckpoint(String transformId, Long timestamp, Long checkpoint, Map<String, long[]> checkpoints,
+            Long timeUpperBound) {
         this.transformId = transformId;
         this.timestampMillis = timestamp.longValue();
         this.checkpoint = checkpoint;
