@@ -118,6 +118,8 @@ public class DataFrameTransformState implements Task.Status, PersistentTaskState
      * @return checkpoint in progress or 0 if task/indexer is not active
      */
     public long getInProgressCheckpoint() {
+
+        // todo: what if task has been paused?
         return indexerState.equals(IndexerState.INDEXING) ? checkpoint + 1L : 0;
     }
 

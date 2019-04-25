@@ -30,6 +30,7 @@ import org.elasticsearch.xpack.core.dataframe.action.StartDataFrameTransformTask
 import org.elasticsearch.xpack.core.dataframe.action.StopDataFrameTransformAction;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameIndexerTransformStats;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransform;
+import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformCheckpoint;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformConfig;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformProgress;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformState;
@@ -363,6 +364,7 @@ public class DataFrameTransformTask extends AllocatedPersistentTask implements S
         private IndexerState indexerState = IndexerState.STOPPED;
         private Map<String, Object> initialPosition;
         private DataFrameTransformProgress progress;
+        private DataFrameTransformCheckpoint inProgressCheckpoint;
 
         ClientDataFrameIndexer build(DataFrameTransformTask parentTask) {
             return new ClientDataFrameIndexer(this.transformId,
@@ -376,6 +378,7 @@ public class DataFrameTransformTask extends AllocatedPersistentTask implements S
                 this.transformConfig,
                 this.fieldMappings,
                 this.progress,
+                this.inProgressCheckpoint,
                 parentTask);
         }
 
@@ -437,6 +440,11 @@ public class DataFrameTransformTask extends AllocatedPersistentTask implements S
             this.progress = progress;
             return this;
         }
+
+        ClientDataFrameIndexerBuilder setInProgressCheckpoint(DataFrameTransformCheckpoint inProgressCheckpoint) {
+            this.inProgressCheckpoint = inProgressCheckpoint;
+            return this;
+        }
     }
 
     static class ClientDataFrameIndexer extends DataFrameIndexer {
@@ -465,6 +473,7 @@ public class DataFrameTransformTask extends AllocatedPersistentTask implements S
                                DataFrameTransformConfig transformConfig,
                                Map<String, String> fieldMappings,
                                DataFrameTransformProgress transformProgress,
+                               DataFrameTransformCheckpoint inProgressCheckpoint,
                                DataFrameTransformTask parentTask) {
             super(ExceptionsHelper.requireNonNull(parentTask, "parentTask")
                     .threadPool
@@ -472,7 +481,8 @@ public class DataFrameTransformTask extends AllocatedPersistentTask implements S
                 ExceptionsHelper.requireNonNull(auditor, "auditor"),
                 ExceptionsHelper.requireNonNull(initialState, "initialState"),
                 initialPosition,
-                initialStats == null ? new DataFrameIndexerTransformStats(transformId) : initialStats);
+                initialStats == null ? new DataFrameIndexerTransformStats(transformId) : initialStats,
+                inProgressCheckpoint);
             this.transformId = ExceptionsHelper.requireNonNull(transformId, "transformId");
             this.transformsConfigManager = ExceptionsHelper.requireNonNull(transformsConfigManager, "transformsConfigManager");
             this.transformsCheckpointService = ExceptionsHelper.requireNonNull(transformsCheckpointService,
@@ -640,7 +650,7 @@ public class DataFrameTransformTask extends AllocatedPersistentTask implements S
         }
 
         @Override
-        protected void createCheckpoint(ActionListener<Void> listener) {
+        protected void createCheckpoint(ActionListener<DataFrameTransformCheckpoint> listener) {
             transformsCheckpointService.getCheckpoint(transformConfig,
                 transformTask.currentCheckpoint.get() + 1,
                 ActionListener.wrap(

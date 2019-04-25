@@ -14,6 +14,8 @@ import org.elasticsearch.common.xcontent.ConstructingObjectParser;
 import org.elasticsearch.common.xcontent.ObjectParser;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentParser;
+import org.elasticsearch.index.query.QueryBuilder;
+import org.elasticsearch.index.query.RangeQueryBuilder;
 import org.elasticsearch.xpack.core.dataframe.DataFrameField;
 import org.elasticsearch.xpack.core.ml.utils.ExceptionsHelper;
 
@@ -131,5 +133,10 @@ public class TimeSyncConfig  implements SyncConfig {
     @Override
     public String getWriteableName() {
         return DataFrameField.TIME_BASED_SYNC.getPreferredName();
+    }
+
+    @Override
+    public QueryBuilder getFilterQuery(DataFrameTransformCheckpoint checkpoint) {
+        return new RangeQueryBuilder(field).lt(checkpoint.getTimeUpperBound());
     }
 }

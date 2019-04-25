@@ -14,20 +14,20 @@ import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.search.SearchPhaseExecutionException;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
-import org.elasticsearch.common.Nullable;
 import org.elasticsearch.action.search.ShardSearchFailure;
+import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.breaker.CircuitBreakingException;
-import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentBuilder;
+import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.search.aggregations.bucket.composite.CompositeAggregation;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.xpack.core.dataframe.DataFrameField;
 import org.elasticsearch.xpack.core.dataframe.DataFrameMessages;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameIndexerTransformStats;
+import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformCheckpoint;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformConfig;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformProgress;
-import org.elasticsearch.xpack.core.dataframe.transforms.TimeSyncConfig;
 import org.elasticsearch.xpack.core.indexing.AsyncTwoPhaseIndexer;
 import org.elasticsearch.xpack.core.indexing.IndexerState;
 import org.elasticsearch.xpack.core.indexing.IterationResult;
@@ -55,14 +55,17 @@ public abstract class DataFrameIndexer extends AsyncTwoPhaseIndexer<Map<String, 
 
     private Pivot pivot;
     private int pageSize = 0;
+    private DataFrameTransformCheckpoint inProgressCheckpoint;
 
     public DataFrameIndexer(Executor executor,
                             DataFrameAuditor auditor,
                             AtomicReference<IndexerState> initialState,
                             Map<String, Object> initialPosition,
-                            DataFrameIndexerTransformStats jobStats) {
+                            DataFrameIndexerTransformStats jobStats,
+                            DataFrameTransformCheckpoint inProgressCheckpoint) {
         super(executor, initialState, initialPosition, jobStats);
         this.auditor = Objects.requireNonNull(auditor);
+        this.inProgressCheckpoint = inProgressCheckpoint;
     }
 
     protected abstract DataFrameTransformConfig getConfig();
@@ -81,12 +84,11 @@ public abstract class DataFrameIndexer extends AsyncTwoPhaseIndexer<Map<String, 
     /**
      * Request a checkpoint
      */
-    protected abstract void createCheckpoint(ActionListener<Void> listener);
+    protected abstract void createCheckpoint(ActionListener<DataFrameTransformCheckpoint> listener);
 
     @Override
     protected void onStart(long now, ActionListener<Void> listener) {
         try {
-            QueryBuilder queryBuilder = getConfig().getSource().getQueryConfig().getQuery();
             pivot = new Pivot(getConfig().getPivotConfig());
 
             // if we haven't set the page size yet, if it is set we might have reduced it after running into an out of memory
@@ -96,7 +98,11 @@ public abstract class DataFrameIndexer extends AsyncTwoPhaseIndexer<Map<String, 
 
             // if run for the 1st time, create checkpoint
             if (initialRun()) {
-                createCheckpoint(listener);
+                createCheckpoint(ActionListener.wrap(cp -> {
+                    inProgressCheckpoint = cp;
+                    listener.onResponse(null);
+
+                }, listener::onFailure));
             } else {
                 listener.onResponse(null);
             }
@@ -178,20 +184,12 @@ public abstract class DataFrameIndexer extends AsyncTwoPhaseIndexer<Map<String, 
 
         DataFrameTransformConfig config = getConfig();
         if (config.getSyncConfig() != null) {
+            BoolQueryBuilder filteredQuery = new BoolQueryBuilder().
+                    filter(pivotQueryBuilder).
+                    filter(config.getSyncConfig().getFilterQuery(inProgressCheckpoint));
 
-
-            if (config.getSyncConfig() instanceof TimeSyncConfig) {
-                TimeSyncConfig timeSyncConfig = (TimeSyncConfig) config.getSyncConfig();
-
-                String timeField = timeSyncConfig.getField();
-                TimeValue delay = timeSyncConfig.getDelay();
-
-                // QueryBuilder timeQuery = new RangeQueryBuilder(timeField).lt();
-
-                //config.getSyncConfig().getTimeSyncConfig().getField()
-                // BoolQueryBuilder().filter(pivotQueryBuilder).filter(timeQuery);
-                sourceBuilder.query(pivotQueryBuilder);
-            }
+            logger.info("running filtered query: " + filteredQuery);
+            sourceBuilder.query(filteredQuery);
         } else {
             sourceBuilder.query(pivotQueryBuilder);
         }
