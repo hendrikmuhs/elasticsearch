@@ -26,6 +26,7 @@ import org.elasticsearch.common.xcontent.ConstructingObjectParser;
 import org.elasticsearch.common.xcontent.ToXContentObject;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentParser;
+import org.elasticsearch.common.xcontent.XContentParserUtils;
 
 import java.io.IOException;
 import java.util.Objects;
@@ -38,12 +39,15 @@ public class DataFrameTransformConfig implements ToXContentObject {
     public static final ParseField ID = new ParseField("id");
     public static final ParseField SOURCE = new ParseField("source");
     public static final ParseField DEST = new ParseField("dest");
+
+    public static final ParseField SYNC = new ParseField("sync");
     // types of transforms
     public static final ParseField PIVOT_TRANSFORM = new ParseField("pivot");
 
     private final String id;
     private final SourceConfig source;
     private final DestConfig dest;
+    private final SyncConfig syncConfig;
     private final PivotConfig pivotConfig;
 
     public static final ConstructingObjectParser<DataFrameTransformConfig, Void> PARSER =
@@ -52,16 +56,27 @@ public class DataFrameTransformConfig implements ToXContentObject {
                     String id = (String) args[0];
                     SourceConfig source = (SourceConfig) args[1];
                     DestConfig dest = (DestConfig) args[2];
-                    PivotConfig pivotConfig = (PivotConfig) args[3];
-                    return new DataFrameTransformConfig(id, source, dest, pivotConfig);
+                    SyncConfig syncConfig = (SyncConfig) args[3];
+                    PivotConfig pivotConfig = (PivotConfig) args[4];
+                    return new DataFrameTransformConfig(id, source, dest, syncConfig, pivotConfig);
                 });
 
     static {
         PARSER.declareString(constructorArg(), ID);
         PARSER.declareObject(constructorArg(), (p, c) -> SourceConfig.PARSER.apply(p, null), SOURCE);
         PARSER.declareObject(constructorArg(), (p, c) -> DestConfig.PARSER.apply(p, null), DEST);
+        PARSER.declareObject(optionalConstructorArg(), (p, c) -> parseSyncConfig(p), SYNC);
         PARSER.declareObject(optionalConstructorArg(), (p, c) -> PivotConfig.fromXContent(p), PIVOT_TRANSFORM);
     }
+
+    private static SyncConfig parseSyncConfig(XContentParser parser) throws IOException {
+        XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, parser.currentToken(), parser::getTokenLocation);
+        XContentParserUtils.ensureExpectedToken(XContentParser.Token.FIELD_NAME, parser.nextToken(), parser::getTokenLocation);
+        SyncConfig syncConfig = parser.namedObject(SyncConfig.class, parser.currentName(), true);
+        XContentParserUtils.ensureExpectedToken(XContentParser.Token.END_OBJECT, parser.nextToken(), parser::getTokenLocation);
+        return syncConfig;
+    }
+
 
     public static DataFrameTransformConfig fromXContent(final XContentParser parser) {
         return PARSER.apply(parser, null);
@@ -71,10 +86,12 @@ public class DataFrameTransformConfig implements ToXContentObject {
     public DataFrameTransformConfig(final String id,
                                     final SourceConfig source,
                                     final DestConfig dest,
+                                    final SyncConfig syncConfig,
                                     final PivotConfig pivotConfig) {
         this.id = id;
         this.source = source;
         this.dest = dest;
+        this.syncConfig = syncConfig;
         this.pivotConfig = pivotConfig;
     }
 
@@ -88,6 +105,10 @@ public class DataFrameTransformConfig implements ToXContentObject {
 
     public DestConfig getDestination() {
         return dest;
+    }
+
+    public SyncConfig getSyncConfig() {
+        return syncConfig;
     }
 
     public PivotConfig getPivotConfig() {
@@ -105,6 +126,11 @@ public class DataFrameTransformConfig implements ToXContentObject {
         }
         if (dest != null) {
             builder.field(DEST.getPreferredName(), dest);
+        }
+        if (syncConfig != null) {
+            builder.startObject(SYNC.getPreferredName());
+            builder.field(syncConfig.getName(), syncConfig);
+            builder.endObject();
         }
         if (pivotConfig != null) {
             builder.field(PIVOT_TRANSFORM.getPreferredName(), pivotConfig);
@@ -128,12 +154,13 @@ public class DataFrameTransformConfig implements ToXContentObject {
         return Objects.equals(this.id, that.id)
                 && Objects.equals(this.source, that.source)
                 && Objects.equals(this.dest, that.dest)
+                && Objects.equals(this.syncConfig, that.syncConfig)
                 && Objects.equals(this.pivotConfig, that.pivotConfig);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, source, dest, pivotConfig);
+        return Objects.hash(id, source, dest, syncConfig, pivotConfig);
     }
 
     @Override
