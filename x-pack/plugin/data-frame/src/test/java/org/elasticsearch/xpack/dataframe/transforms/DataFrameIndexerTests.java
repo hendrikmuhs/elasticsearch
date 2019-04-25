@@ -22,6 +22,7 @@ import org.elasticsearch.common.util.concurrent.ThreadContext;
 import org.elasticsearch.test.ESTestCase;
 import org.elasticsearch.threadpool.ThreadPool;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameIndexerTransformStats;
+import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformCheckpoint;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformConfig;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformConfigTests;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformProgress;
@@ -73,7 +74,7 @@ public class DataFrameIndexerTests extends ESTestCase {
                 Function<SearchRequest, SearchResponse> searchFunction,
                 Function<BulkRequest, BulkResponse> bulkFunction,
                 Consumer<Exception> failureConsumer) {
-            super(executor, auditor, initialState, initialPosition, jobStats);
+            super(executor, auditor, initialState, initialPosition, jobStats, DataFrameTransformCheckpoint.EMPTY);
             this.transformConfig = Objects.requireNonNull(transformConfig);
             this.fieldMappings = Objects.requireNonNull(fieldMappings);
             this.searchFunction = searchFunction;
@@ -101,8 +102,8 @@ public class DataFrameIndexerTests extends ESTestCase {
         }
 
         @Override
-        protected void createCheckpoint(ActionListener<Void> listener) {
-            listener.onResponse(null);
+        protected void createCheckpoint(ActionListener<DataFrameTransformCheckpoint> listener) {
+            listener.onResponse(DataFrameTransformCheckpoint.EMPTY);
         }
 
         @Override

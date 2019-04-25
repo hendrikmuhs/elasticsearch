@@ -14,20 +14,21 @@ import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.search.SearchPhaseExecutionException;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
-import org.elasticsearch.common.Nullable;
 import org.elasticsearch.action.search.ShardSearchFailure;
+import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.breaker.CircuitBreakingException;
-import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentBuilder;
+import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.search.aggregations.bucket.composite.CompositeAggregation;
+import org.elasticsearch.search.aggregations.bucket.composite.CompositeAggregationBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.xpack.core.dataframe.DataFrameField;
 import org.elasticsearch.xpack.core.dataframe.DataFrameMessages;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameIndexerTransformStats;
+import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformCheckpoint;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformConfig;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformProgress;
-import org.elasticsearch.xpack.core.dataframe.transforms.TimeSyncConfig;
 import org.elasticsearch.xpack.core.indexing.AsyncTwoPhaseIndexer;
 import org.elasticsearch.xpack.core.indexing.IndexerState;
 import org.elasticsearch.xpack.core.indexing.IterationResult;
@@ -36,6 +37,10 @@ import org.elasticsearch.xpack.dataframe.transforms.pivot.Pivot;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Executor;
@@ -55,14 +60,18 @@ public abstract class DataFrameIndexer extends AsyncTwoPhaseIndexer<Map<String, 
 
     private Pivot pivot;
     private int pageSize = 0;
+    protected volatile DataFrameTransformCheckpoint inProgressCheckpoint;
+    private volatile Map<String, List<String>> changedBuckets;
 
     public DataFrameIndexer(Executor executor,
                             DataFrameAuditor auditor,
                             AtomicReference<IndexerState> initialState,
                             Map<String, Object> initialPosition,
-                            DataFrameIndexerTransformStats jobStats) {
+                            DataFrameIndexerTransformStats jobStats,
+                            DataFrameTransformCheckpoint inProgressCheckpoint) {
         super(executor, initialState, initialPosition, jobStats);
         this.auditor = Objects.requireNonNull(auditor);
+        this.inProgressCheckpoint = inProgressCheckpoint;
     }
 
     protected abstract DataFrameTransformConfig getConfig();
@@ -81,12 +90,11 @@ public abstract class DataFrameIndexer extends AsyncTwoPhaseIndexer<Map<String, 
     /**
      * Request a checkpoint
      */
-    protected abstract void createCheckpoint(ActionListener<Void> listener);
+    protected abstract void createCheckpoint(ActionListener<DataFrameTransformCheckpoint> listener);
 
     @Override
     protected void onStart(long now, ActionListener<Void> listener) {
         try {
-            QueryBuilder queryBuilder = getConfig().getSource().getQueryConfig().getQuery();
             pivot = new Pivot(getConfig().getPivotConfig());
 
             // if we haven't set the page size yet, if it is set we might have reduced it after running into an out of memory
@@ -96,7 +104,23 @@ public abstract class DataFrameIndexer extends AsyncTwoPhaseIndexer<Map<String, 
 
             // if run for the 1st time, create checkpoint
             if (initialRun()) {
-                createCheckpoint(listener);
+                createCheckpoint(ActionListener.wrap(cp -> {
+                    if (inProgressCheckpoint.isEmpty() == false) {
+                        getChangedBuckets(inProgressCheckpoint, cp, ActionListener.wrap(r -> {
+
+                            inProgressCheckpoint = cp;
+
+                            logger.info("created cont checkpoint");
+                            listener.onResponse(null);
+                        }, listener::onFailure));
+                    } else {
+
+                        inProgressCheckpoint = cp;
+
+                        logger.info("created checkpoint");
+                        listener.onResponse(null);
+                    }
+                }, listener::onFailure));
             } else {
                 listener.onResponse(null);
             }
@@ -113,11 +137,18 @@ public abstract class DataFrameIndexer extends AsyncTwoPhaseIndexer<Map<String, 
     protected void onFinish(ActionListener<Void> listener) {
         // reset the page size, so we do not memorize a low page size forever, the pagesize will be re-calculated on start
         pageSize = 0;
+        changedBuckets = null;
     }
 
     @Override
     protected IterationResult<Map<String, Object>> doProcess(SearchResponse searchResponse) {
         final CompositeAggregation agg = searchResponse.getAggregations().get(COMPOSITE_AGGREGATION_NAME);
+
+        // we reached the end
+        if (agg.getBuckets().isEmpty()) {
+            return new IterationResult<>(Collections.emptyList(), null, true);
+        }
+
         long docsBeforeProcess = getStats().getNumDocuments();
         IterationResult<Map<String, Object>> result = new IterationResult<>(processBucketsToIndexRequests(agg).collect(Collectors.toList()),
             agg.afterKey(),
@@ -178,20 +209,17 @@ public abstract class DataFrameIndexer extends AsyncTwoPhaseIndexer<Map<String, 
 
         DataFrameTransformConfig config = getConfig();
         if (config.getSyncConfig() != null) {
-
-
-            if (config.getSyncConfig() instanceof TimeSyncConfig) {
-                TimeSyncConfig timeSyncConfig = (TimeSyncConfig) config.getSyncConfig();
-
-                String timeField = timeSyncConfig.getField();
-                TimeValue delay = timeSyncConfig.getDelay();
-
-                // QueryBuilder timeQuery = new RangeQueryBuilder(timeField).lt();
-
-                //config.getSyncConfig().getTimeSyncConfig().getField()
-                // BoolQueryBuilder().filter(pivotQueryBuilder).filter(timeQuery);
-                sourceBuilder.query(pivotQueryBuilder);
+            if (inProgressCheckpoint == null) {
+                throw new RuntimeException("in progress checkpoint not found");
             }
+
+            BoolQueryBuilder filteredQuery = new BoolQueryBuilder().
+                    filter(pivotQueryBuilder).
+                    filter(config.getSyncConfig().getBoundaryQuery(inProgressCheckpoint)).
+                    filter(pivot.updateQuery(changedBuckets));
+
+            logger.info("running filtered query: " + filteredQuery);
+            sourceBuilder.query(filteredQuery);
         } else {
             sourceBuilder.query(pivotQueryBuilder);
         }
@@ -238,6 +266,75 @@ public abstract class DataFrameIndexer extends AsyncTwoPhaseIndexer<Map<String, 
         return true;
     }
 
+    private void getChangedBuckets(DataFrameTransformCheckpoint oldCheckpoint, DataFrameTransformCheckpoint newCheckpoint,
+            ActionListener<Void> listener) {
+        SearchRequest searchRequest = new SearchRequest(getConfig().getSource().getIndex());
+        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
+
+        // TODO: we do not need the sub-aggs
+        CompositeAggregationBuilder changesAgg = pivot.buildChangesAggregation(null, pageSize);
+        sourceBuilder.aggregation(changesAgg);
+        sourceBuilder.size(0);
+
+        QueryBuilder pivotQueryBuilder = getConfig().getSource().getQueryConfig().getQuery();
+
+        DataFrameTransformConfig config = getConfig();
+        if (config.getSyncConfig() != null) {
+            if (inProgressCheckpoint == null) {
+                throw new RuntimeException("in progress checkpoint not found");
+            }
+
+            BoolQueryBuilder filteredQuery = new BoolQueryBuilder().
+                    filter(pivotQueryBuilder).
+                    filter(config.getSyncConfig().getChangesQuery(oldCheckpoint, newCheckpoint));
+
+            logger.info("changes query: " + filteredQuery);
+            sourceBuilder.query(filteredQuery);
+        } else {
+
+            // TODO: makes no sense
+            sourceBuilder.query(pivotQueryBuilder);
+        }
+
+        searchRequest.source(sourceBuilder);
+        searchRequest.allowPartialSearchResults(false);
+
+        //List<Map<String, Object>> keys = new ArrayList<>();
+        Map<String, List<String>> keys = new HashMap<>();
+
+        collectChangedBuckets(searchRequest, changesAgg, keys, ActionListener.wrap(allKeys -> {
+            logger.info("changed keys" + allKeys);
+            changedBuckets = allKeys;
+            listener.onResponse(null);
+        }, listener::onFailure));
+    }
+
+    void collectChangedBuckets(SearchRequest searchRequest, CompositeAggregationBuilder changesAgg, Map<String, List<String>> keys,
+            ActionListener<Map<String, List<String>>> finalListener) {
+        doNextSearch(searchRequest, ActionListener.wrap(searchResponse -> {
+            //long numberOfHits = searchResponse.getHits().getTotalHits().value;
+            final CompositeAggregation agg = searchResponse.getAggregations().get(COMPOSITE_AGGREGATION_NAME);
+            agg.getBuckets().stream().forEach(bucket -> {
+                bucket.getKey().forEach((k, v) -> {
+                    logger.info("key " + k + " value " + v);
+                    keys.computeIfAbsent(k, l -> new ArrayList<>()).add(v.toString());
+                });
+
+            });
+
+            logger.info("found buckets: " + keys.size());
+
+            /*if (keys.size() > 0 && agg.afterKey().containsKey(keys.get(keys.size()-1))) {
+                // adjust the after key
+                changesAgg.aggregateAfter(agg.afterKey());
+                collectChangedBuckets(searchRequest, changesAgg, keys, finalListener);
+            } else {*/
+                logger.info("changed keys" + keys);
+                finalListener.onResponse(keys);
+            //}
+        }, finalListener::onFailure));
+    }
+
     /**
      * Inspect exception for circuit breaking exception and return the first one it can find.
      *
@@ -263,4 +360,6 @@ public abstract class DataFrameIndexer extends AsyncTwoPhaseIndexer<Map<String, 
 
         return null;
     }
+
+    protected abstract boolean checkForUpdate();
 }
