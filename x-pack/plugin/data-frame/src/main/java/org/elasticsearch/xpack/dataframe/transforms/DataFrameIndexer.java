@@ -17,14 +17,17 @@ import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.common.Nullable;
 import org.elasticsearch.action.search.ShardSearchFailure;
 import org.elasticsearch.common.breaker.CircuitBreakingException;
+import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.search.aggregations.bucket.composite.CompositeAggregation;
+import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.xpack.core.dataframe.DataFrameField;
 import org.elasticsearch.xpack.core.dataframe.DataFrameMessages;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameIndexerTransformStats;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformConfig;
 import org.elasticsearch.xpack.core.dataframe.transforms.DataFrameTransformProgress;
+import org.elasticsearch.xpack.core.dataframe.transforms.TimeSyncConfig;
 import org.elasticsearch.xpack.core.indexing.AsyncTwoPhaseIndexer;
 import org.elasticsearch.xpack.core.indexing.IndexerState;
 import org.elasticsearch.xpack.core.indexing.IterationResult;
@@ -84,7 +87,7 @@ public abstract class DataFrameIndexer extends AsyncTwoPhaseIndexer<Map<String, 
     protected void onStart(long now, ActionListener<Void> listener) {
         try {
             QueryBuilder queryBuilder = getConfig().getSource().getQueryConfig().getQuery();
-            pivot = new Pivot(getConfig().getSource().getIndex(), queryBuilder, getConfig().getPivotConfig());
+            pivot = new Pivot(getConfig().getPivotConfig());
 
             // if we haven't set the page size yet, if it is set we might have reduced it after running into an out of memory
             if (pageSize == 0) {
@@ -166,7 +169,35 @@ public abstract class DataFrameIndexer extends AsyncTwoPhaseIndexer<Map<String, 
 
     @Override
     protected SearchRequest buildSearchRequest() {
-        return pivot.buildSearchRequest(getPosition(), pageSize);
+        SearchRequest searchRequest = new SearchRequest(getConfig().getSource().getIndex());
+        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
+        sourceBuilder.aggregation(pivot.buildAggregation(getPosition(), pageSize));
+        sourceBuilder.size(0);
+
+        QueryBuilder pivotQueryBuilder = getConfig().getSource().getQueryConfig().getQuery();
+
+        DataFrameTransformConfig config = getConfig();
+        if (config.getSyncConfig() != null) {
+
+
+            if (config.getSyncConfig() instanceof TimeSyncConfig) {
+                TimeSyncConfig timeSyncConfig = (TimeSyncConfig) config.getSyncConfig();
+
+                String timeField = timeSyncConfig.getField();
+                TimeValue delay = timeSyncConfig.getDelay();
+
+                // QueryBuilder timeQuery = new RangeQueryBuilder(timeField).lt();
+
+                //config.getSyncConfig().getTimeSyncConfig().getField()
+                // BoolQueryBuilder().filter(pivotQueryBuilder).filter(timeQuery);
+                sourceBuilder.query(pivotQueryBuilder);
+            }
+        } else {
+            sourceBuilder.query(pivotQueryBuilder);
+        }
+
+        searchRequest.source(sourceBuilder);
+        return searchRequest;
     }
 
     /**

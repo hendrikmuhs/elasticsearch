@@ -309,9 +309,11 @@ public class DataFrameTransformIT extends ESRestHighLevelClientTestCase {
 
         DestConfig destConfig = (destination != null) ? new DestConfig(destination) : null;
 
+
         return new DataFrameTransformConfig(id,
                 new SourceConfig(new String[]{source}, queryConfig),
                 destConfig,
+                null,
                 pivotConfig,
             "this is a test transform");
     }
@@ -332,6 +334,7 @@ public class DataFrameTransformIT extends ESRestHighLevelClientTestCase {
         DataFrameTransformConfig transform = new DataFrameTransformConfig(id,
             new SourceConfig(new String[]{sourceIndex}, queryConfig),
             new DestConfig("pivot-dest"),
+            null,
             pivotConfig,
             "transform for testing stats");
 
