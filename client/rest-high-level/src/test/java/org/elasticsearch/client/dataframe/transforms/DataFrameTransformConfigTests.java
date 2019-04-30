@@ -38,8 +38,9 @@ import static org.elasticsearch.client.dataframe.transforms.SourceConfigTests.ra
 public class DataFrameTransformConfigTests extends AbstractXContentTestCase<DataFrameTransformConfig> {
 
     public static DataFrameTransformConfig randomDataFrameTransformConfig() {
-        return new DataFrameTransformConfig(randomAlphaOfLengthBetween(1, 10), randomSourceConfig(),
-                randomDestConfig(), randomBoolean() ? randomSyncConfig() : null, PivotConfigTests.randomPivotConfig(), randomBoolean() ? null : randomAlphaOfLengthBetween(1, 100));
+        return new DataFrameTransformConfig(randomAlphaOfLengthBetween(1, 10), randomSourceConfig(), randomDestConfig(),
+                randomBoolean() ? randomSyncConfig() : null, PivotConfigTests.randomPivotConfig(),
+                randomBoolean() ? null : randomAlphaOfLengthBetween(1, 100));
     }
 
     public static SyncConfig randomSyncConfig() {

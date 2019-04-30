@@ -69,8 +69,7 @@ public class PreviewDataFrameTransformRequestTests extends AbstractXContentTestC
                 containsString("preview requires a non-null data frame config"));
 
         // null id and destination is valid
-        DataFrameTransformConfig config = DataFrameTransformConfig.forPreview(randomSourceConfig(),
-                DataFrameTransformConfigTests.randomSyncConfig(), PivotConfigTests.randomPivotConfig());
+        DataFrameTransformConfig config = DataFrameTransformConfig.forPreview(randomSourceConfig(), PivotConfigTests.randomPivotConfig());
 
         assertFalse(new PreviewDataFrameTransformRequest(config).validate().isPresent());
 

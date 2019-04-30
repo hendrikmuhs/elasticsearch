@@ -87,7 +87,7 @@ public class DataFrameTransformConfig extends AbstractDiffable<DataFrameTransfor
 
                     PivotConfig pivotConfig = (PivotConfig) args[6];
                     String description = (String)args[7];
-                    return new DataFrameTransformConfig(id, source, dest, headers, syncConfig, pivotConfig, description);
+                    return new DataFrameTransformConfig(id, source, dest, syncConfig, headers, pivotConfig, description);
                 });
 
         parser.declareString(optionalConstructorArg(), DataFrameField.ID);

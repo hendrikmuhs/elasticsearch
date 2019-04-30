@@ -181,6 +181,11 @@ public class DataFrameIndexerTests extends ESTestCase {
             fail("failIndexer should not be called, received error: " + message);
         }
 
+        @Override
+        protected boolean checkForUpdate() {
+            return false;
+        }
+
     }
 
     @Before

@@ -98,7 +98,7 @@ public class DataFrameTransformConfig implements ToXContentObject {
      * @return A DataFrameTransformConfig to preview, NOTE it will have a {@code null} id, destination and index.
      */
     public static DataFrameTransformConfig forPreview(final SourceConfig source, final PivotConfig pivotConfig) {
-        return new DataFrameTransformConfig(null, source, null, pivotConfig, null);
+        return new DataFrameTransformConfig(null, source, null, null, pivotConfig, null);
     }
 
     public DataFrameTransformConfig(final String id,

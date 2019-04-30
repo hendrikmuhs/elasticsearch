@@ -142,7 +142,7 @@ public class DataFrameTransformDocumentationIT extends ESRestHighLevelClientTest
                 sourceConfig, // <2>
                 new DestConfig("pivot-destination"),  // <3>
                 null, // <4>
-                pivotConfig);  // <5>
+                pivotConfig,  // <5>
                 "This is my test transform");  // <6>
         // end::put-data-frame-transform-config
 
@@ -392,7 +392,7 @@ public class DataFrameTransformDocumentationIT extends ESRestHighLevelClientTest
             DataFrameTransformConfig.forPreview(
                 new SourceConfig(new String[]{"source-data"}, queryConfig), // <1>
                 pivotConfig); // <2>
-                null,
+
         PreviewDataFrameTransformRequest request =
                 new PreviewDataFrameTransformRequest(transformConfig); // <3>
         // end::preview-data-frame-transform-request
