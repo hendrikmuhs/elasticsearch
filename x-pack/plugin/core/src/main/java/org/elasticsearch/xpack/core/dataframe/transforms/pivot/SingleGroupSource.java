@@ -96,7 +96,7 @@ public abstract class SingleGroupSource implements Writeable, ToXContentObject {
 
     public abstract Type getType();
 
-    public abstract QueryBuilder getUpdateQuery(List<String> changedBuckets);
+    public abstract QueryBuilder getFilterQuery(List<String> changedBuckets);
 
     public String getField() {
         return field;

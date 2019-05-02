@@ -183,7 +183,8 @@ public class DateHistogramGroupSource extends SingleGroupSource {
     }
 
     @Override
-    public QueryBuilder getUpdateQuery(List<String> changedBuckets) {
-        throw new RuntimeException("not supported");
+    public QueryBuilder getFilterQuery(List<String> changedBuckets) {
+        // no need for an extra range filter as this is already done by checkpoints
+        return null;
     }
 }

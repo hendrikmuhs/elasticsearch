@@ -182,7 +182,7 @@ public class DataFrameIndexerTests extends ESTestCase {
         }
 
         @Override
-        protected boolean checkForUpdate() {
+        protected boolean sourceHasChanged() {
             return false;
         }
 
@@ -208,7 +208,8 @@ public class DataFrameIndexerTests extends ESTestCase {
         Function<BulkRequest, BulkResponse> bulkFunction = bulkRequest -> new BulkResponse(new BulkItemResponse[0], 100);
 
         Consumer<Exception> failureConsumer = e -> {
-            fail("expected circuit breaker exception to be handled");
+            e.printStackTrace();
+            fail("expected circuit breaker exception to be handled, got " + e);
         };
 
         final ExecutorService executor = Executors.newFixedThreadPool(1);

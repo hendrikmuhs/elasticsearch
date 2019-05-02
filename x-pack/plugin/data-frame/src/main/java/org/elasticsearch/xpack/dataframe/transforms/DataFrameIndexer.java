@@ -87,6 +87,10 @@ public abstract class DataFrameIndexer extends AsyncTwoPhaseIndexer<Map<String, 
         return pageSize;
     }
 
+    public boolean isContinuous() {
+        return getConfig().getSyncConfig() != null;
+    }
+
     /**
      * Request a checkpoint
      */
@@ -110,11 +114,10 @@ public abstract class DataFrameIndexer extends AsyncTwoPhaseIndexer<Map<String, 
 
                             inProgressCheckpoint = cp;
 
-                            logger.info("created cont checkpoint");
+                            logger.info("created checkpoint");
                             listener.onResponse(null);
                         }, listener::onFailure));
                     } else {
-
                         inProgressCheckpoint = cp;
 
                         logger.info("created checkpoint");
@@ -215,8 +218,14 @@ public abstract class DataFrameIndexer extends AsyncTwoPhaseIndexer<Map<String, 
 
             BoolQueryBuilder filteredQuery = new BoolQueryBuilder().
                     filter(pivotQueryBuilder).
-                    filter(config.getSyncConfig().getBoundaryQuery(inProgressCheckpoint)).
-                    filter(pivot.updateQuery(changedBuckets));
+                    filter(config.getSyncConfig().getBoundaryQuery(inProgressCheckpoint));
+
+            if (changedBuckets != null && changedBuckets.isEmpty() == false) {
+                QueryBuilder pivotFilter = pivot.filterBuckets(changedBuckets);
+                if (pivotFilter != null) {
+                    filteredQuery.filter(pivotFilter);
+                }
+            }
 
             logger.info("running filtered query: " + filteredQuery);
             sourceBuilder.query(filteredQuery);
@@ -271,7 +280,7 @@ public abstract class DataFrameIndexer extends AsyncTwoPhaseIndexer<Map<String, 
         SearchRequest searchRequest = new SearchRequest(getConfig().getSource().getIndex());
         SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
 
-        // TODO: we do not need the sub-aggs
+        // we do not need the sub-aggs
         CompositeAggregationBuilder changesAgg = pivot.buildChangesAggregation(null, pageSize);
         sourceBuilder.aggregation(changesAgg);
         sourceBuilder.size(0);
@@ -291,15 +300,14 @@ public abstract class DataFrameIndexer extends AsyncTwoPhaseIndexer<Map<String, 
             logger.info("changes query: " + filteredQuery);
             sourceBuilder.query(filteredQuery);
         } else {
-
-            // TODO: makes no sense
-            sourceBuilder.query(pivotQueryBuilder);
+            logger.info("found no sync configuration");
+            listener.onResponse(null);
+            return;
         }
 
         searchRequest.source(sourceBuilder);
         searchRequest.allowPartialSearchResults(false);
 
-        //List<Map<String, Object>> keys = new ArrayList<>();
         Map<String, List<String>> keys = new HashMap<>();
 
         collectChangedBuckets(searchRequest, changesAgg, keys, ActionListener.wrap(allKeys -> {
@@ -312,26 +320,25 @@ public abstract class DataFrameIndexer extends AsyncTwoPhaseIndexer<Map<String, 
     void collectChangedBuckets(SearchRequest searchRequest, CompositeAggregationBuilder changesAgg, Map<String, List<String>> keys,
             ActionListener<Map<String, List<String>>> finalListener) {
         doNextSearch(searchRequest, ActionListener.wrap(searchResponse -> {
-            //long numberOfHits = searchResponse.getHits().getTotalHits().value;
+            long numberOfHits = searchResponse.getHits().getTotalHits().value;
             final CompositeAggregation agg = searchResponse.getAggregations().get(COMPOSITE_AGGREGATION_NAME);
             agg.getBuckets().stream().forEach(bucket -> {
                 bucket.getKey().forEach((k, v) -> {
                     logger.info("key " + k + " value " + v);
                     keys.computeIfAbsent(k, l -> new ArrayList<>()).add(v.toString());
                 });
-
             });
 
             logger.info("found buckets: " + keys.size());
 
-            /*if (keys.size() > 0 && agg.afterKey().containsKey(keys.get(keys.size()-1))) {
+            if (numberOfHits == keys.size()) {
                 // adjust the after key
                 changesAgg.aggregateAfter(agg.afterKey());
                 collectChangedBuckets(searchRequest, changesAgg, keys, finalListener);
-            } else {*/
+            } else {
                 logger.info("changed keys" + keys);
                 finalListener.onResponse(keys);
-            //}
+            }
         }, finalListener::onFailure));
     }
 
@@ -361,5 +368,5 @@ public abstract class DataFrameIndexer extends AsyncTwoPhaseIndexer<Map<String, 
         return null;
     }
 
-    protected abstract boolean checkForUpdate();
+    protected abstract boolean sourceHasChanged();
 }

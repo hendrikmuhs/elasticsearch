@@ -279,8 +279,8 @@ public class DataFrameTransformTask extends AllocatedPersistentTask implements S
         if (event.getJobName().equals(SCHEDULE_NAME + "_" + transform.getId())) {
             logger.info("Data frame indexer [{}] schedule has triggered, state: [{}]", event.getJobName(), getIndexer().getState());
 
-            if (getIndexer().checkForUpdate()) {
-
+            if (getIndexer().isContinuous() && getIndexer().sourceHasChanged()) {
+                logger.info("Source has changed, triggering new indexer run");
                 getIndexer().maybeTriggerAsyncJob(System.currentTimeMillis());
             }
         }
@@ -673,7 +673,7 @@ public class DataFrameTransformTask extends AllocatedPersistentTask implements S
         }
 
         @Override
-        public boolean checkForUpdate() {
+        public boolean sourceHasChanged() {
             if (getState() == IndexerState.INDEXING) {
                 logger.warn("still running");
                 return false;

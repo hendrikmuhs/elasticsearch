@@ -52,7 +52,7 @@ public class TermsGroupSource extends SingleGroupSource {
     }
 
     @Override
-    public QueryBuilder getUpdateQuery(List<String> changedBuckets) {
+    public QueryBuilder getFilterQuery(List<String> changedBuckets) {
         return new TermsQueryBuilder(field, changedBuckets);
     }
 }

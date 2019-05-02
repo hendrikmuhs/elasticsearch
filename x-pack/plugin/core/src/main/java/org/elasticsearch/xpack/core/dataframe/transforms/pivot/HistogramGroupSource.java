@@ -103,7 +103,8 @@ public class HistogramGroupSource extends SingleGroupSource {
     }
 
     @Override
-    public QueryBuilder getUpdateQuery(List<String> changedBuckets) {
-        throw new RuntimeException("not supported");
+    public QueryBuilder getFilterQuery(List<String> changedBuckets) {
+        // histograms are simple and cheap, so we skip this optimization
+        return null;
     }
 }

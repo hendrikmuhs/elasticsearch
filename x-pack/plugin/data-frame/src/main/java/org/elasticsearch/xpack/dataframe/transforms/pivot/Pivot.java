@@ -18,6 +18,7 @@ import org.elasticsearch.common.xcontent.NamedXContentRegistry;
 import org.elasticsearch.common.xcontent.ToXContentObject;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentParser;
+import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.search.aggregations.AggregationBuilder;
@@ -154,19 +155,43 @@ public class Pivot {
         }));
     }
 
-    public QueryBuilder updateQuery(Map<String, List<String>> changedBuckets) {
+    public QueryBuilder filterBuckets(Map<String, List<String>> changedBuckets) {
 
-        // todo: only works for 1 source
-        for ( Entry<String, SingleGroupSource> g: config.getGroupConfig().getGroups().entrySet()) {
-            String field = g.getValue().getField();
-            logger.info(g.getKey() + "/" +field);
-
-
-            return g.getValue().getUpdateQuery(changedBuckets.get(g.getKey()));
-            //return g.getValue().getUpdateQuery(changedBuckets);
+        if (changedBuckets == null || changedBuckets.isEmpty()) {
+            return null;
         }
-        return null;
 
+        if (config.getGroupConfig().getGroups().size() == 1) {
+            Entry<String, SingleGroupSource> entry = config.getGroupConfig().getGroups().entrySet().iterator().next();
+            logger.info("filter by bucket: " + entry.getKey() + "/" + entry.getValue().getField());
+            if (changedBuckets.containsKey(entry.getKey())) {
+                return entry.getValue().getFilterQuery(changedBuckets.get(entry.getKey()));
+            } else {
+                // should never happen
+                throw new RuntimeException("Could not find bucket value for key " + entry.getKey());
+            }
+        }
+
+        // else: more than 1 group by, need to nest it
+        BoolQueryBuilder filteredQuery = new BoolQueryBuilder();
+        for (Entry<String, SingleGroupSource> entry : config.getGroupConfig().getGroups().entrySet()) {
+            String field = entry.getValue().getField();
+            logger.info("filter by bucket: " + entry.getKey() + "/" + field);
+
+            if (changedBuckets.containsKey(entry.getKey())) {
+                QueryBuilder sourceQueryFilter = entry.getValue().getFilterQuery(changedBuckets.get(entry.getKey()));
+                // the source might not define an filter optimization
+                if (sourceQueryFilter != null) {
+                    filteredQuery.filter(sourceQueryFilter);
+                }
+            } else {
+                // should never happen
+                throw new RuntimeException("Could not find bucket value for key " + entry.getKey());
+            }
+
+        }
+
+        return filteredQuery;
     }
 
     private static CompositeAggregationBuilder createCompositeAggregation(PivotConfig config) {
