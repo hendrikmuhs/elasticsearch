@@ -55,6 +55,7 @@ public class PivotTests extends ESTestCase {
     private Client client;
 
     private final Set<String> supportedAggregations = Stream.of(AggregationType.values()).map(AggregationType::getName)
+            .filter(a -> {return Aggregations.isSpecialAggregation(a) == false;})
             .collect(Collectors.toSet());
     private final String[] unsupportedAggregations = { "stats" };
 

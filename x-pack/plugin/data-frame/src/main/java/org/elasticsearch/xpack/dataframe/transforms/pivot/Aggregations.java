@@ -6,8 +6,15 @@
 
 package org.elasticsearch.xpack.dataframe.transforms.pivot;
 
+import org.elasticsearch.search.aggregations.bucket.composite.CompositeAggregation.Bucket;
+
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -30,6 +37,7 @@ public final class Aggregations {
      */
     enum AggregationType {
         AVG("avg", "double"),
+        COUNT("count", "long", Aggregations::extractCount),
         CARDINALITY("cardinality", "long"),
         VALUE_COUNT("value_count", "long"),
         MAX("max", SOURCE),
@@ -41,10 +49,16 @@ public final class Aggregations {
 
         private final String aggregationType;
         private final String targetMapping;
+        private final Function<Bucket, Object> bucketFunction;
 
         AggregationType(String name, String targetMapping) {
+            this(name, targetMapping, null);
+        }
+
+        AggregationType(String name, String targetMapping, Function<Bucket, Object> bucketFunction) {
             this.aggregationType = name;
             this.targetMapping = targetMapping;
+            this.bucketFunction = bucketFunction;
         }
 
         public String getName() {
@@ -53,6 +67,14 @@ public final class Aggregations {
 
         public String getTargetMapping() {
             return targetMapping;
+        }
+
+        public Function<Bucket, Object> getBucketFunction() {
+            return bucketFunction;
+        }
+
+        public boolean isSpecialAggregation() {
+            return bucketFunction != null;
         }
     }
 
@@ -67,8 +89,50 @@ public final class Aggregations {
         return DYNAMIC.equals(targetMapping);
     }
 
+    public static boolean isSpecialAggregation(String aggregationType) {
+        return AggregationType.valueOf(aggregationType.toUpperCase(Locale.ROOT)).isSpecialAggregation();
+    }
+
     public static String resolveTargetMapping(String aggregationType, String sourceType) {
         AggregationType agg = AggregationType.valueOf(aggregationType.toUpperCase(Locale.ROOT));
         return agg.getTargetMapping().equals(SOURCE) ? sourceType : agg.getTargetMapping();
+    }
+
+    public static  Map<String, Object> filterSpecialFunctions( Map<String, Object> source) {
+        Set<String> fieldsToRemove = new HashSet<>();
+
+        for (Entry<String, Object> entry : source.entrySet()) {
+            String field = entry.getKey();
+            if (entry.getValue() instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> aggregations = (Map<String, Object>) entry.getValue();
+                if (aggregations.size() == 1) {
+                    Entry<String, Object> agg = aggregations.entrySet().iterator().next();
+                    AggregationType aggType = AggregationType.valueOf(agg.getKey().toUpperCase(Locale.ROOT));
+                    if (aggType.isSpecialAggregation()) {
+                        // mark field to be removed
+                        fieldsToRemove.add(field);
+                    }
+                }
+            }
+        }
+
+        if (fieldsToRemove.size() > 0) {
+
+            Map<String, Object> copyWithoutSpecialFields = new LinkedHashMap<>();
+            for (Entry<String, Object> entry:source.entrySet()) {
+                if (fieldsToRemove.contains(entry.getKey()) == false) {
+                    copyWithoutSpecialFields.put(entry.getKey(), entry.getValue());
+                }
+            }
+
+            return copyWithoutSpecialFields;
+        }
+
+        return source;
+    }
+
+    public static Long extractCount(Bucket bucket) {
+        return 0L;
     }
 }
