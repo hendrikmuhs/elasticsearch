@@ -27,10 +27,10 @@ import org.elasticsearch.xpack.core.scheduler.SchedulerEngine.Event;
 import org.elasticsearch.xpack.core.transform.TransformField;
 import org.elasticsearch.xpack.core.transform.TransformMessages;
 import org.elasticsearch.xpack.core.transform.action.StartTransformAction;
-import org.elasticsearch.xpack.core.transform.transforms.TransformIndexerPosition;
-import org.elasticsearch.xpack.core.transform.transforms.TransformIndexerStats;
 import org.elasticsearch.xpack.core.transform.transforms.Transform;
 import org.elasticsearch.xpack.core.transform.transforms.TransformCheckpointingInfo;
+import org.elasticsearch.xpack.core.transform.transforms.TransformIndexerPosition;
+import org.elasticsearch.xpack.core.transform.transforms.TransformIndexerStats;
 import org.elasticsearch.xpack.core.transform.transforms.TransformState;
 import org.elasticsearch.xpack.core.transform.transforms.TransformTaskState;
 import org.elasticsearch.xpack.transform.checkpoint.DataFrameTransformsCheckpointService;
@@ -206,9 +206,9 @@ public class DataFrameTransformTask extends AllocatedPersistentTask implements S
      * @param startingCheckpoint The starting checkpoint, could null. Null indicates that there is no starting checkpoint
      * @param listener The listener to alert once started
      */
-    synchronized void start(Long startingCheckpoint, ActionListener<StartDataFrameTransformAction.Response> listener) {
+    synchronized void start(Long startingCheckpoint, ActionListener<StartTransformAction.Response> listener) {
         logger.debug("[{}] start called with state [{}].", getTransformId(), getState());
-        if (taskState.get() == DataFrameTransformTaskState.FAILED) {
+        if (taskState.get() == TransformTaskState.FAILED) {
             listener.onFailure(new ElasticsearchStatusException(
                 TransformMessages.getMessage(DATA_FRAME_CANNOT_START_FAILED_TRANSFORM,
                     getTransformId(),

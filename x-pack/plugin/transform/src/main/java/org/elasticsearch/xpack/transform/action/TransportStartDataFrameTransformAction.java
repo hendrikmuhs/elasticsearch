@@ -55,7 +55,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-import static org.elasticsearch.xpack.core.transform.DataFrameMessages.DATA_FRAME_CANNOT_START_FAILED_TRANSFORM;
+import static org.elasticsearch.xpack.core.transform.TransformMessages.DATA_FRAME_CANNOT_START_FAILED_TRANSFORM;
 
 public class TransportStartDataFrameTransformAction extends
     TransportMasterNodeAction<StartTransformAction.Request, StartTransformAction.Response> {
@@ -136,7 +136,7 @@ public class TransportStartDataFrameTransformAction extends
                     TransformState transformState = (TransformState)existingTask.getState();
                     if(transformState.getTaskState() == TransformTaskState.FAILED) {
                         listener.onFailure(new ElasticsearchStatusException(
-                            DataFrameMessages.getMessage(DATA_FRAME_CANNOT_START_FAILED_TRANSFORM,
+                            TransformMessages.getMessage(DATA_FRAME_CANNOT_START_FAILED_TRANSFORM,
                                 request.getId(),
                                 transformState.getReason()),
                             RestStatus.CONFLICT));
