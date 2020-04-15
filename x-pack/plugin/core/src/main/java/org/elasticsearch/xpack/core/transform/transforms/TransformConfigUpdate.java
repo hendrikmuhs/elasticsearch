@@ -47,7 +47,8 @@ public class TransformConfigUpdate implements Writeable, ToXContentObject {
                 TimeValue.parseTimeValue((String) args[2], TransformField.FREQUENCY.getPreferredName());
             SyncConfig syncConfig = (SyncConfig) args[3];
             String description = (String) args[4];
-            return new TransformConfigUpdate(source, dest, frequency, syncConfig, description);
+            SettingsConfig settings = (SettingsConfig) args[5];
+            return new TransformConfigUpdate(source, dest, frequency, syncConfig, description, settings);
         });
 
     static {
@@ -56,6 +57,7 @@ public class TransformConfigUpdate implements Writeable, ToXContentObject {
         PARSER.declareString(optionalConstructorArg(), TransformField.FREQUENCY);
         PARSER.declareObject(optionalConstructorArg(), (p, c) -> parseSyncConfig(p), TransformField.SYNC);
         PARSER.declareString(optionalConstructorArg(), TransformField.DESCRIPTION);
+        PARSER.declareObject(optionalConstructorArg(), (p, c) -> SettingsConfig.fromXContent(p, false), TransformField.SETTINGS);
     }
 
     private static SyncConfig parseSyncConfig(XContentParser parser) throws IOException {
@@ -71,13 +73,15 @@ public class TransformConfigUpdate implements Writeable, ToXContentObject {
     private final TimeValue frequency;
     private final SyncConfig syncConfig;
     private final String description;
+    private final SettingsConfig settings;
     private Map<String, String> headers;
 
     public TransformConfigUpdate(final SourceConfig source,
                                           final DestConfig dest,
                                           final TimeValue frequency,
                                           final SyncConfig syncConfig,
-                                          final String description){
+                                          final String description,
+                                          final SettingsConfig settings){
         this.source = source;
         this.dest = dest;
         this.frequency = frequency;
@@ -86,6 +90,7 @@ public class TransformConfigUpdate implements Writeable, ToXContentObject {
         if (this.description != null && this.description.length() > MAX_DESCRIPTION_LENGTH) {
             throw new IllegalArgumentException("[description] must be less than 1000 characters in length.");
         }
+        this.settings = settings;
     }
 
     public TransformConfigUpdate(final StreamInput in) throws IOException {
@@ -97,6 +102,12 @@ public class TransformConfigUpdate implements Writeable, ToXContentObject {
         if (in.readBoolean()) {
             setHeaders(in.readMap(StreamInput::readString, StreamInput::readString));
         }
+        if (in.getVersion().onOrAfter(Version.V_8_0_0)) {  // todo: V_7_8_0
+            settings = in.readOptionalWriteable(SettingsConfig::new);
+        } else {
+            settings = new SettingsConfig();
+        }
+
     }
 
     public SourceConfig getSource() {
@@ -120,6 +131,10 @@ public class TransformConfigUpdate implements Writeable, ToXContentObject {
         return description;
     }
 
+    public SettingsConfig getSettings() {
+        return settings;
+    }
+
     public Map<String, String> getHeaders() {
         return headers;
     }
@@ -140,6 +155,9 @@ public class TransformConfigUpdate implements Writeable, ToXContentObject {
             out.writeMap(headers, StreamOutput::writeString, StreamOutput::writeString);
         } else {
             out.writeBoolean(false);
+        }
+        if (out.getVersion().onOrAfter(Version.V_8_0_0)) {
+            out.writeOptionalWriteable(settings);
         }
     }
 

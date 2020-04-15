@@ -34,7 +34,8 @@ public class TransformConfigUpdateTests extends AbstractSerializingTransformTest
             randomBoolean() ? null : randomDestConfig(),
             randomBoolean() ? null : TimeValue.timeValueMillis(randomIntBetween(1_000, 3_600_000)),
             randomBoolean() ? null : randomSyncConfig(),
-            randomBoolean() ? null : randomAlphaOfLengthBetween(1, 1000)
+            randomBoolean() ? null : randomAlphaOfLengthBetween(1, 1000),
+            randomBoolean() ? null : SettingsConfigTests.randomSettingsConfig()
         );
     }
 
@@ -60,14 +61,15 @@ public class TransformConfigUpdateTests extends AbstractSerializingTransformTest
     public void testIsNoop() {
         for (int i = 0; i < NUMBER_OF_TEST_RUNS; i++) {
             TransformConfig config = randomTransformConfig();
-            TransformConfigUpdate update = new TransformConfigUpdate(null, null, null, null, null);
+            TransformConfigUpdate update = new TransformConfigUpdate(null, null, null, null, null, null);
             assertTrue("null update is not noop", update.isNoop(config));
             update = new TransformConfigUpdate(
                 config.getSource(),
                 config.getDestination(),
                 config.getFrequency(),
                 config.getSyncConfig(),
-                config.getDescription()
+                config.getDescription(),
+                config.getSettings()
             );
             assertTrue("equal update is not noop", update.isNoop(config));
 
@@ -76,7 +78,8 @@ public class TransformConfigUpdateTests extends AbstractSerializingTransformTest
                 config.getDestination(),
                 config.getFrequency(),
                 config.getSyncConfig(),
-                "this is a new description"
+                "this is a new description",
+                config.getSettings()
             );
             assertFalse("true update is noop", update.isNoop(config));
         }
@@ -92,10 +95,11 @@ public class TransformConfigUpdateTests extends AbstractSerializingTransformTest
             Collections.singletonMap("key", "value"),
             PivotConfigTests.randomPivotConfig(),
             randomBoolean() ? null : randomAlphaOfLengthBetween(1, 1000),
+            SettingsConfigTests.randomSettingsConfig(),
             randomBoolean() ? null : Instant.now(),
             randomBoolean() ? null : Version.V_7_2_0.toString()
         );
-        TransformConfigUpdate update = new TransformConfigUpdate(null, null, null, null, null);
+        TransformConfigUpdate update = new TransformConfigUpdate(null, null, null, null, null, null);
 
         assertThat(config, equalTo(update.apply(config)));
         SourceConfig sourceConfig = new SourceConfig("the_new_index");
@@ -103,7 +107,8 @@ public class TransformConfigUpdateTests extends AbstractSerializingTransformTest
         TimeValue frequency = TimeValue.timeValueSeconds(10);
         SyncConfig syncConfig = new TimeSyncConfig("time_field", TimeValue.timeValueSeconds(30));
         String newDescription = "new description";
-        update = new TransformConfigUpdate(sourceConfig, destConfig, frequency, syncConfig, newDescription);
+        SettingsConfig settings = new SettingsConfig(4_000, 4_000);
+        update = new TransformConfigUpdate(sourceConfig, destConfig, frequency, syncConfig, newDescription, settings);
 
         Map<String, String> headers = Collections.singletonMap("foo", "bar");
         update.setHeaders(headers);
@@ -114,6 +119,7 @@ public class TransformConfigUpdateTests extends AbstractSerializingTransformTest
         assertThat(updatedConfig.getFrequency(), equalTo(frequency));
         assertThat(updatedConfig.getSyncConfig(), equalTo(syncConfig));
         assertThat(updatedConfig.getDescription(), equalTo(newDescription));
+        assertThat(updatedConfig.getSettings(), equalTo(settings));
         assertThat(updatedConfig.getHeaders(), equalTo(headers));
         assertThat(updatedConfig.getVersion(), equalTo(Version.CURRENT));
     }
@@ -128,11 +134,12 @@ public class TransformConfigUpdateTests extends AbstractSerializingTransformTest
             null,
             PivotConfigTests.randomPivotConfig(),
             randomBoolean() ? null : randomAlphaOfLengthBetween(1, 1000),
+            SettingsConfigTests.randomSettingsConfig(),
             randomBoolean() ? null : Instant.now(),
             randomBoolean() ? null : Version.CURRENT.toString()
         );
 
-        TransformConfigUpdate update = new TransformConfigUpdate(null, null, null, TimeSyncConfigTests.randomTimeSyncConfig(), null);
+        TransformConfigUpdate update = new TransformConfigUpdate(null, null, null, TimeSyncConfigTests.randomTimeSyncConfig(), null, null);
 
         ElasticsearchStatusException ex = expectThrows(ElasticsearchStatusException.class, () -> update.apply(batchConfig));
         assertThat(
@@ -149,11 +156,12 @@ public class TransformConfigUpdateTests extends AbstractSerializingTransformTest
             null,
             PivotConfigTests.randomPivotConfig(),
             randomBoolean() ? null : randomAlphaOfLengthBetween(1, 1000),
+            SettingsConfigTests.randomSettingsConfig(),
             randomBoolean() ? null : Instant.now(),
             randomBoolean() ? null : Version.CURRENT.toString()
         );
 
-        TransformConfigUpdate fooSyncUpdate = new TransformConfigUpdate(null, null, null, new FooSync(), null);
+        TransformConfigUpdate fooSyncUpdate = new TransformConfigUpdate(null, null, null, new FooSync(), null, null);
         ex = expectThrows(ElasticsearchStatusException.class, () -> fooSyncUpdate.apply(timeSyncedConfig));
         assertThat(
             ex.getMessage(),

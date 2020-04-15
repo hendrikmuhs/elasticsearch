@@ -56,6 +56,7 @@ public class TransformConfig extends AbstractDiffable<TransformConfig> implement
     private final DestConfig dest;
     private final TimeValue frequency;
     private final SyncConfig syncConfig;
+    private final SettingsConfig settings;
     private final String description;
     // headers store the user context from the creating user, which allows us to run the transform as this user
     // the header only contains name, groups and other context but no authorization keys
@@ -105,6 +106,7 @@ public class TransformConfig extends AbstractDiffable<TransformConfig> implement
 
                     PivotConfig pivotConfig = (PivotConfig) args[7];
                     String description = (String)args[8];
+                    SettingsConfig settings = (SettingsConfig)args[9];
                     return new TransformConfig(id,
                         source,
                         dest,
@@ -113,8 +115,9 @@ public class TransformConfig extends AbstractDiffable<TransformConfig> implement
                         headers,
                         pivotConfig,
                         description,
-                        (Instant)args[9],
-                        (String)args[10]);
+                        settings,
+                        (Instant)args[10],
+                        (String)args[11]);
                 });
 
         parser.declareString(optionalConstructorArg(), TransformField.ID);
@@ -129,6 +132,7 @@ public class TransformConfig extends AbstractDiffable<TransformConfig> implement
         parser.declareObject(optionalConstructorArg(), (p, c) -> p.mapStrings(), HEADERS);
         parser.declareObject(optionalConstructorArg(), (p, c) -> PivotConfig.fromXContent(p, lenient), PIVOT_TRANSFORM);
         parser.declareString(optionalConstructorArg(), TransformField.DESCRIPTION);
+        parser.declareString(optionalConstructorArg(), TransformField.SETTINGS);
         parser.declareField(optionalConstructorArg(),
             p -> TimeUtils.parseTimeFieldToInstant(p, TransformField.CREATE_TIME.getPreferredName()), TransformField.CREATE_TIME,
             ObjectParser.ValueType.VALUE);
@@ -156,6 +160,7 @@ public class TransformConfig extends AbstractDiffable<TransformConfig> implement
                              final Map<String, String> headers,
                              final PivotConfig pivotConfig,
                              final String description,
+                             final SettingsConfig settings,
                              final Instant createTime,
                              final String version){
         this.id = ExceptionsHelper.requireNonNull(id, TransformField.ID.getPreferredName());
@@ -166,6 +171,7 @@ public class TransformConfig extends AbstractDiffable<TransformConfig> implement
         this.setHeaders(headers == null ? Collections.emptyMap() : headers);
         this.pivotConfig = pivotConfig;
         this.description = description;
+        this.settings = settings == null ? new SettingsConfig() : settings;
 
         // at least one function must be defined
         if (this.pivotConfig == null) {
@@ -186,7 +192,7 @@ public class TransformConfig extends AbstractDiffable<TransformConfig> implement
                                     final Map<String, String> headers,
                                     final PivotConfig pivotConfig,
                                     final String description) {
-        this(id, source, dest, frequency, syncConfig, headers, pivotConfig, description, null, null);
+        this(id, source, dest, frequency, syncConfig, headers, pivotConfig, description, null, null, null);
     }
 
     public TransformConfig(final StreamInput in) throws IOException {
@@ -209,6 +215,11 @@ public class TransformConfig extends AbstractDiffable<TransformConfig> implement
             syncConfig = null;
             createTime = null;
             transformVersion = null;
+        }
+        if (in.getVersion().onOrAfter(Version.V_8_0_0)) { // todo: V_7_8_0
+            settings = new SettingsConfig(in);
+        } else {
+            settings = new SettingsConfig();
         }
     }
 
@@ -269,6 +280,10 @@ public class TransformConfig extends AbstractDiffable<TransformConfig> implement
         return description;
     }
 
+    public SettingsConfig getSettings() {
+        return settings;
+    }
+
     public boolean isValid() {
         if (pivotConfig != null && pivotConfig.isValid() == false) {
             return false;
@@ -278,7 +293,7 @@ public class TransformConfig extends AbstractDiffable<TransformConfig> implement
             return false;
         }
 
-        return source.isValid() && dest.isValid();
+        return settings.isValid() && source.isValid() && dest.isValid();
     }
 
     @Override
@@ -301,6 +316,9 @@ public class TransformConfig extends AbstractDiffable<TransformConfig> implement
             } else {
                 out.writeBoolean(false);
             }
+        }
+        if (out.getVersion().onOrAfter(Version.V_8_0_0)) { // todo: V_7_8_0
+            settings.writeTo(out);
         }
     }
 
@@ -330,6 +348,7 @@ public class TransformConfig extends AbstractDiffable<TransformConfig> implement
         if (description != null) {
             builder.field(TransformField.DESCRIPTION.getPreferredName(), description);
         }
+        builder.field(TransformField.SETTINGS.getPreferredName(), settings);
         if (transformVersion != null) {
             builder.field(TransformField.VERSION.getPreferredName(), transformVersion);
         }
@@ -361,13 +380,14 @@ public class TransformConfig extends AbstractDiffable<TransformConfig> implement
                 && Objects.equals(this.headers, that.headers)
                 && Objects.equals(this.pivotConfig, that.pivotConfig)
                 && Objects.equals(this.description, that.description)
+                && Objects.equals(this.settings, that.settings)
                 && Objects.equals(this.createTime, that.createTime)
                 && Objects.equals(this.transformVersion, that.transformVersion);
     }
 
     @Override
     public int hashCode(){
-        return Objects.hash(id, source, dest, frequency, syncConfig, headers, pivotConfig, description, createTime, transformVersion);
+        return Objects.hash(id, source, dest, frequency, syncConfig, headers, pivotConfig, description, settings, createTime, transformVersion);
     }
 
     @Override
@@ -392,6 +412,7 @@ public class TransformConfig extends AbstractDiffable<TransformConfig> implement
         private Version transformVersion;
         private Instant createTime;
         private PivotConfig pivotConfig;
+        private SettingsConfig settings;
 
         public Builder() { }
 
@@ -405,6 +426,7 @@ public class TransformConfig extends AbstractDiffable<TransformConfig> implement
             this.transformVersion = config.transformVersion;
             this.createTime = config.createTime;
             this.pivotConfig = config.pivotConfig;
+            this.settings = config.settings;
         }
 
         public Builder setId(String id) {
@@ -437,6 +459,11 @@ public class TransformConfig extends AbstractDiffable<TransformConfig> implement
             return this;
         }
 
+        public Builder setSettings(SettingsConfig settings) {
+            this.settings = settings;
+            return this;
+        }
+
         public Builder setHeaders(Map<String, String> headers) {
             this.headers = headers;
             return this;
@@ -461,6 +488,7 @@ public class TransformConfig extends AbstractDiffable<TransformConfig> implement
                 headers,
                 pivotConfig,
                 description,
+                settings,
                 createTime,
                 transformVersion == null ? null : transformVersion.toString());
         }
@@ -485,13 +513,14 @@ public class TransformConfig extends AbstractDiffable<TransformConfig> implement
                 && Objects.equals(this.headers, that.headers)
                 && Objects.equals(this.pivotConfig, that.pivotConfig)
                 && Objects.equals(this.description, that.description)
+                && Objects.equals(this.settings, that.settings)
                 && Objects.equals(this.createTime, that.createTime)
                 && Objects.equals(this.transformVersion, that.transformVersion);
         }
 
         @Override
         public int hashCode(){
-            return Objects.hash(id, source, dest, frequency, syncConfig, headers, pivotConfig, description, createTime, transformVersion);
+            return Objects.hash(id, source, dest, frequency, syncConfig, headers, pivotConfig, description, settings, createTime, transformVersion);
         }
     }
 }
