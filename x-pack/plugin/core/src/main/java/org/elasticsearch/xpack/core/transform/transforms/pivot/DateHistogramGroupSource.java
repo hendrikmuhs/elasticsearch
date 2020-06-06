@@ -211,8 +211,8 @@ public class DateHistogramGroupSource extends SingleGroupSource {
     private final ZoneId timeZone;
     private Rounding rounding;
 
-    public DateHistogramGroupSource(String field, ScriptConfig scriptConfig, Interval interval, ZoneId timeZone) {
-        super(field, scriptConfig);
+    public DateHistogramGroupSource(String field, ScriptConfig scriptConfig, boolean missingBucket, Interval interval, ZoneId timeZone) {
+        super(field, scriptConfig, missingBucket);
         this.interval = interval;
         this.timeZone = timeZone;
 
@@ -244,9 +244,10 @@ public class DateHistogramGroupSource extends SingleGroupSource {
         ConstructingObjectParser<DateHistogramGroupSource, Void> parser = new ConstructingObjectParser<>(NAME, lenient, (args) -> {
             String field = (String) args[0];
             ScriptConfig scriptConfig = (ScriptConfig) args[1];
-            String fixedInterval = (String) args[2];
-            String calendarInterval = (String) args[3];
-            ZoneId zoneId = (ZoneId) args[4];
+            boolean missingBucket = args[2] == null ? false : (boolean) args[2];
+            String fixedInterval = (String) args[3];
+            String calendarInterval = (String) args[4];
+            ZoneId zoneId = (ZoneId) args[5];
 
             Interval interval = null;
 
@@ -260,7 +261,7 @@ public class DateHistogramGroupSource extends SingleGroupSource {
                 throw new IllegalArgumentException("You must specify either fixed_interval or calendar_interval, found none");
             }
 
-            return new DateHistogramGroupSource(field, scriptConfig, interval, zoneId);
+            return new DateHistogramGroupSource(field, scriptConfig, missingBucket, interval, zoneId);
         });
 
         declareValuesSourceFields(parser, lenient);

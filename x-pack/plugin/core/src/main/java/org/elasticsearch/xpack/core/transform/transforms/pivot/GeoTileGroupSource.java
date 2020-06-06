@@ -68,7 +68,7 @@ public class GeoTileGroupSource extends SingleGroupSource {
     private final GeoBoundingBox geoBoundingBox;
 
     public GeoTileGroupSource(final String field, final Integer precision, final GeoBoundingBox boundingBox) {
-        super(field, null);
+        super(field, null, false);
         if (precision != null) {
             GeoTileUtils.checkPrecisionRange(precision);
         }
