@@ -358,7 +358,11 @@ public class CompositeBucketsChangeCollector implements ChangeCollector {
 
             if (changedBuckets.isEmpty() == false) {
                 boundingBoxesQueryBuilder = QueryBuilders.boolQuery();
-                changedBuckets.stream().map(GeoTileUtils::toBoundingBox).map(this::toGeoQuery).forEach(boundingBoxesQueryBuilder::should);
+                for(String c: changedBuckets) {
+                    return boundingBoxesQueryBuilder.should(toGeoQuery(GeoTileUtils.toBoundingBox(c)));
+                }
+                return boundingBoxesQueryBuilder;
+                //changedBuckets.stream().map(GeoTileUtils::toBoundingBox).map(this::toGeoQuery).forEach(boundingBoxesQueryBuilder::should);
             }
 
             if (missingBucket && foundNullBucket) {
@@ -426,8 +430,8 @@ public class CompositeBucketsChangeCollector implements ChangeCollector {
         private GeoBoundingBoxQueryBuilder toGeoQuery(Rectangle rectangle) {
             return QueryBuilders.geoBoundingBoxQuery(sourceFieldName)
                 .setCorners(
-                    new GeoPoint(rectangle.getMaxLat(), rectangle.getMinLon()),
-                    new GeoPoint(rectangle.getMinLat(), rectangle.getMaxLon())
+                    new GeoPoint(Math.min(90, rectangle.getMaxLat()+0.01), Math.max(-180, rectangle.getMinLon()-0.01)),
+                    new GeoPoint(Math.max(-90, rectangle.getMinLat()-0.01), Math.min(180, rectangle.getMaxLon()+0.01))
                 );
         }
 

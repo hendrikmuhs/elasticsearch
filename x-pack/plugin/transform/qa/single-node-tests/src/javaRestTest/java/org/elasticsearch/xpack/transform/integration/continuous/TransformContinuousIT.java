@@ -125,6 +125,7 @@ public class TransformContinuousIT extends ESRestTestCase {
     public void registerTestCases() {
         addTestCaseIfNotDisabled(new TermsGroupByIT());
         addTestCaseIfNotDisabled(new DateHistogramGroupByIT());
+        addTestCaseIfNotDisabled(new GeoTileGroupByIT());
     }
 
     @Before
@@ -142,6 +143,16 @@ public class TransformContinuousIT extends ESRestTestCase {
     @After
     public void removePipelines() throws IOException {
         deletePipeline(ContinuousTestCase.INGEST_PIPELINE);
+    }
+
+    @Override
+    protected boolean preserveClusterUponCompletion() {
+        return true;
+    }
+
+    @Override
+    protected boolean preserveIndicesUponCompletion() {
+        return true;
     }
 
     public void testContinousEvents() throws Exception {
@@ -190,7 +201,9 @@ public class TransformContinuousIT extends ESRestTestCase {
             final StringBuilder source = new StringBuilder();
             BulkRequest bulkRequest = new BulkRequest(sourceIndexName);
 
-            int numDocs = randomIntBetween(1000, 20000);
+            //int numDocs = randomIntBetween(1000, 20000);
+            int numDocs = 20;
+
             for (int numDoc = 0; numDoc < numDocs; numDoc++) {
                 source.append("{");
                 String event = events.get((numDoc + randomIntBetween(0, 50)) % 50);

@@ -49,7 +49,6 @@ def projectPathsToExclude = [
   ':client:benchmark',
   ':client:client-benchmark-noop-api-plugin',
   ':client:rest',
-  ':client:rest-high-level',
   ':client:sniffer',
   ':client:test',
   ':example-plugins:custom-settings',
@@ -126,7 +125,6 @@ def projectPathsToExclude = [
   ':x-pack:plugin:async-search:qa',
   ':x-pack:plugin:ccr',
   ':x-pack:plugin:ccr:qa',
-  ':x-pack:plugin:core',
   ':x-pack:plugin:deprecation',
   ':x-pack:plugin:enrich:qa:common',
   ':x-pack:plugin:eql',
@@ -154,7 +152,6 @@ def projectPathsToExclude = [
   ':x-pack:plugin:sql:sql-cli',
   ':x-pack:plugin:sql:sql-client',
   ':x-pack:plugin:sql:sql-proto',
-  ':x-pack:plugin:transform',
   ':x-pack:plugin:vectors',
   ':x-pack:plugin:voting-only-node',
   ':x-pack:plugin:watcher',
@@ -165,16 +162,46 @@ def projectPathsToExclude = [
   ':x-pack:test:smb-fixture'
 ]
 
+List<String> getChangedFilesByProject(Project project) {
+  // Get list of all changed files
+  ByteArrayOutputStream systemOutStream = new ByteArrayOutputStream()
+
+  String ghprbTargetBranch = System.getenv("ghprbTargetBranch")
+  String targetBranch = ghprbTargetBranch ? "origin/${ghprbTargetBranch}" : "upstream/master"
+  String projectDir = project.getRootDir().toPath().relativize(project.getProjectDir().toPath())
+  String command = "git diff --relative=" + projectDir + " --name-only --diff-filter=ACMRT " + targetBranch
+
+  command.execute().waitForProcessOutput(systemOutStream, System.err)
+  List<String> changedFiles = systemOutStream.toString().trim().split('\n')
+  systemOutStream.close()
+  List<String> changedJavaFiles = new ArrayList<>()
+  for (f in changedFiles) {
+    if (f.endsWith(".java")) {
+      changedJavaFiles.add(f)
+    }
+  }
+  return changedJavaFiles
+}
+
 subprojects {
   plugins.withType(BuildPlugin).whenPluginAdded {
     if (projectPathsToExclude.contains(project.path) == false) {
       project.apply plugin: "com.diffplug.gradle.spotless"
 
+      List<String> changedFiles = getChangedFilesByProject(project)
+
+      println "[" + project.path + "] Check formating of: " + changedFiles
+      if (changedFiles.isEmpty()) {
+        return
+      }
+
       spotless {
         java {
           // Normally this isn't necessary, but we have Java sources in
           // non-standard places
-          target '**/*.java'
+          target project.fileTree('.') {
+            includes= changedFiles
+          }
 
           removeUnusedImports()
           eclipse().configFile rootProject.file('buildSrc/formatterConfig.xml')
