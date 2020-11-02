@@ -59,11 +59,6 @@ public class Map implements Function {
     }
 
     @Override
-    public boolean supportsIncrementalBucketUpdate() {
-        return false;
-    }
-
-    @Override
     public Tuple<Stream<IndexRequest>, java.util.Map<String, Object>> processSearchResponse(
         SearchResponse searchResponse,
         String destinationIndex,
